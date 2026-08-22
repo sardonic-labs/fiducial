@@ -30,16 +30,19 @@ python fiducial/scripts/fiducial.py <command>
 |---|---|
 | `doctor` | Check kicad-cli availability and version |
 | `erc <project.kicad_sch>` | Run ERC, summarize JSON report, exit code reflects errors |
-| `drc <project.kicad_pcb>` | Run DRC, same behavior |
+| `drc <project.kicad_pcb>` | Run DRC, same behavior. Read-only unless you pass `--save-board` |
 | `netlist <project.kicad_sch>` | Export netlist to `<project>-netlist.sexpr` |
 | `nets <project.kicad_sch>` | Dump every net with its connected pins |
 | `pins <project.kicad_sch> <REF>` | Dump one symbol's pins and their nets |
 | `check-intent <project.kicad_sch> intent.csv` | Compare expected connections (`ref,pin,expected_net`) against reality; `--orphans` also flags single-pin nets |
 | `lint <project.kicad_sch>` | Structural checks: duplicate refs, missing fields, unconnected pins, single-use labels, dangling nets |
+| `check-rules <project.kicad_sch> rules.csv` | Verify house-style rules from CSV (see `docs/rules.md`) |
 | `render <project...> --outdir DIR` | Export SVG renders of schematic and/or PCB so you can look at them |
 | `bom <project.kicad_sch>` | Export CSV bill of materials |
 
 Exit codes: `0` clean, `1` violations found, `2` tool/environment error.
+`erc`, `drc`, `check-intent`, `lint`, and `check-rules` accept `--json`
+for machine-readable output with the same exit codes.
 
 ## Instruction library
 
