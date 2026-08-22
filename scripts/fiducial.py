@@ -137,11 +137,9 @@ def cmd_doctor(_args):
 
 def _run_report(kind, path, extra=()):
     report = Path(tempfile.gettempdir()) / f"fiducial-{kind}.json"
-    proc = kicad_cli([kind, str(path), "--format", "json",
-                      "--output", str(report), *extra])
-    if proc.returncode != 0 and kind == "drc":
-        # drc exits nonzero on violations; erc does too. Report may still exist.
-        pass
+    prefix = ["sch"] if kind == "erc" else ["pcb"]
+    proc = kicad_cli(prefix + [kind, str(path), "--format", "json",
+                               "--output", str(report), *extra])
     if not report.exists():
         print(proc.stdout)
         print(proc.stderr, file=sys.stderr)
@@ -224,9 +222,10 @@ def _load_nets(project):
 
 
 def _first_str(node):
+    """Value of a (key "value" ...) node - skips the key itself."""
     if node is None:
         return ""
-    for x in node:
+    for x in node[1:]:
         if isinstance(x, str):
             return x
     return ""
@@ -267,8 +266,8 @@ def _pin_sort(p):
 def cmd_check_intent(args):
     nets, _, _, _ = _load_nets(args.project)
     bad = 0
-    rows = list(csv.DictReader(csv.reader(
-        args.csv.open(encoding="utf-8-sig"))))
+    with open(args.csv, encoding="utf-8-sig", newline="") as fh:
+        rows = list(csv.DictReader(fh))
     required = {"ref", "pin", "expected_net"}
     if rows and not required.issubset(rows[0]):
         print(f"CSV must have columns {sorted(required)}")
@@ -322,7 +321,8 @@ def cmd_lint(args):
         inst = sexp_get(sym, "instances")
         if not inst:
             problems.append(f"{reference}: missing instances block")
-        lib_id = sym[1] if len(sym) > 1 else "?"
+        lib_node = sexp_get(sym, "lib_id")
+        lib_id = _first_str(lib_node) if lib_node else "?"
         if defined and lib_id not in defined:
             problems.append(f"{reference}: uses '{lib_id}' but it is not in lib_symbols")
     seen_uuids = {}
@@ -345,16 +345,22 @@ def cmd_render(args):
     outdir.mkdir(parents=True, exist_ok=True)
     rc = EXIT_OK
     for path in args.projects:
-        s = str(path).lower()
-        sub = kicad_cli(["sch", "export", "svg", str(path), "-o", str(outdir)])
+        stem = Path(path).stem
+        if str(path).lower().endswith(".kicad_pcb"):
+            target = str(outdir / (stem + ".svg"))
+            sub = kicad_cli(["pcb", "export", "svg", str(path), "-o", target,
+                             "--layers", "F.Cu,B.Cu,F.Mask,B.Mask,"
+                                         "F.Silkscreen,B.Silkscreen,Edge.Cuts"])
+        else:
+            # sch export svg writes one file per sheet into the -o directory
+            target = str(outdir / (stem + "-sch"))
+            sub = kicad_cli(["sch", "export", "svg", str(path), "-o", target])
         if sub.returncode != 0:
-            sub = kicad_cli(["pcb", "export", "svg", str(path), "-o", str(outdir),
-                             "--layers", "F.Cu,B.Cu,F.Mask,B.Mask,F.Silkscreen,B.Silkscreen,Edge.Cuts"])
-        if sub.returncode != 0:
-            print(sub.stderr, file=sys.stderr)
+            print(sub.stderr.strip() or sub.stdout.strip(), file=sys.stderr)
+            print(f"ERROR: could not render {path}", file=sys.stderr)
             rc = EXIT_ENV
         else:
-            print(f"rendered {path} -> {outdir}")
+            print(f"rendered {path} -> {target}")
     return rc
 
 
