@@ -1,5 +1,7 @@
 # fiducial
 
+[![CI](https://github.com/sardonic-labs/fiducial/actions/workflows/ci.yml/badge.svg)](https://github.com/sardonic-labs/fiducial/actions/workflows/ci.yml)
+
 > AI agents hallucinate pinouts. fiducial catches them.
 
 **fiducial** is a drop-in submodule that turns any AI coding agent (opencode,
@@ -43,8 +45,8 @@ The bootstrap appends one import line (`@fiducial/AGENTS.md`) to your project's
 `AGENTS.md` and runs an environment check. Idempotent; remove with `-Remove`
 / `--remove`.
 
-Requires: Python 3.7+ (stdlib only — no pip installs) and KiCad 7+ on PATH for
-`kicad-cli`.
+Requires: Python 3.8+ (stdlib only — no pip installs) and KiCad 7+ on PATH for
+`kicad-cli` (CI runs against KiCad 10).
 
 ## What you get
 
@@ -79,6 +81,10 @@ The suite runs against a real AI-authored RP2040 devboard fixture with two
 planted connectivity bugs (floating crystal caps, missing SWD header) and
 asserts the tools catch both while ERC stays deceptively clean. Connectivity
 tests are skipped if `kicad-cli` is not installed.
+
+CI (GitHub Actions) installs KiCad 10 from the official PPA and runs the same
+suite on every push — that's the version-drift canary for `kicad-cli` flag
+changes.
 
 ## Name
 

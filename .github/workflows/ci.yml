@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install KiCad 10
+        run: |
+          sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
+          sudo apt-get update
+          sudo apt-get install -y --install-recommends kicad
+
+      - name: Environment check
+        run: |
+          kicad-cli version
+          python3 --version
+          python3 scripts/fiducial.py doctor
+
+      - name: Run tests
+        run: python3 -m unittest discover -s tests -v
