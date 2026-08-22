@@ -4,6 +4,7 @@
 import argparse
 import csv
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -113,6 +114,69 @@ def kicad_cli(args, timeout=180):
     return proc
 
 
+# ---------------------------------------------------------------- reports
+
+def _summarize_report(kind, target, extra=()):
+    """Run kicad-cli <kind>, parse its JSON report from a unique temp file.
+
+    Returns (summary, exit_code). summary is None on environment error.
+    A unique tempfile guarantees a failure to produce a report can never
+    fall back to parsing a stale report from a previous run.
+    """
+    fd, tmpname = tempfile.mkstemp(prefix=f"fiducial-{kind}-", suffix=".json")
+    os.close(fd)
+    report = Path(tmpname)
+    report.unlink()
+    prefix = ["sch"] if kind == "erc" else ["pcb"]
+    try:
+        proc = kicad_cli(prefix + [kind, str(target), "--format", "json",
+                                   "--output", str(report), *extra])
+        if not report.exists():
+            print(proc.stdout)
+            print(proc.stderr, file=sys.stderr)
+            print(f"ERROR: no {kind.upper()} report produced", file=sys.stderr)
+            return None, EXIT_ENV
+        data = json.loads(report.read_text(encoding="utf-8"))
+    finally:
+        report.unlink(missing_ok=True)
+    errors, warnings, other = [], [], {}
+    for v in data.get(kind, []):
+        sev = v.get("severity", "unknown").replace("severity_", "")
+        if sev == "error":
+            errors.append(v)
+        elif sev == "warning":
+            warnings.append(v)
+        else:
+            other.setdefault(sev, []).append(v)
+    summary = {
+        "tool": kind.upper(),
+        "target": str(target),
+        "error_count": len(errors),
+        "warning_count": len(warnings),
+        "errors": errors,
+        "warnings": warnings,
+        "other_counts": {sev: len(items) for sev, items in sorted(other.items())},
+    }
+    return summary, (EXIT_VIOLATIONS if errors else EXIT_OK)
+
+
+def _print_report_human(summary):
+    print(f"{summary['tool']} on {summary['target']}: "
+          f"{summary['error_count']} errors, {summary['warning_count']} warnings")
+    for sev_name, key in (("ERROR", "errors"), ("WARNING", "warnings")):
+        for v in summary[key]:
+            where = ""
+            for item in v.get("items", []):
+                desc = item.get("description", "")
+                if desc:
+                    where = f" [{desc}]"
+                    break
+            print(f"  {sev_name}: {v.get('type', '?')} @ {v.get('pos', '?')}{where}")
+            print(f"    {v.get('description', '')}")
+    for sev, n in sorted(summary["other_counts"].items()):
+        print(f"  {sev}: {n}")
+
+
 # ---------------------------------------------------------------- commands
 
 def cmd_doctor(_args):
@@ -135,70 +199,81 @@ def cmd_doctor(_args):
     return EXIT_OK if ok else EXIT_ENV
 
 
-def _run_report(kind, path, extra=()):
-    report = Path(tempfile.gettempdir()) / f"fiducial-{kind}.json"
-    prefix = ["sch"] if kind == "erc" else ["pcb"]
-    proc = kicad_cli(prefix + [kind, str(path), "--format", "json",
-                               "--output", str(report), *extra])
-    if not report.exists():
-        print(proc.stdout)
-        print(proc.stderr, file=sys.stderr)
-        print(f"ERROR: no {kind.upper()} report produced", file=sys.stderr)
-        return EXIT_ENV
-    data = json.loads(report.read_text(encoding="utf-8"))
-    viol = data.get(kind, {})
-    by_sev = {}
-    for v in viol:
-        sev = v.get("severity", "unknown").replace("severity_", "")
-        by_sev.setdefault(sev, []).append(v)
-    errors, warns = by_sev.get("error", []), by_sev.get("warning", [])
-    print(f"{kind.upper()} on {path}: {len(errors)} errors, {len(warns)} warnings")
-    for sev in ("error", "warning"):
-        for v in by_sev.get(sev, []):
-            where = ""
-            for item in v.get("items", []):
-                desc = item.get("description", "")
-                if desc:
-                    where = f" [{desc}]"
-                    break
-            print(f"  {sev.upper()}: {v.get('type', '?')} @ {v.get('pos', '?')}{where}")
-            print(f"    {v.get('description', '')}")
-    for sev, items in sorted(by_sev.items()):
-        if sev not in ("error", "warning"):
-            print(f"  {sev}: {len(items)}")
-    if errors:
-        return EXIT_VIOLATIONS
-    return EXIT_OK
-
-
 def cmd_erc(args):
-    return _run_report("erc", args.project)
+    summary, rc = _summarize_report("erc", args.project)
+    if summary is None:
+        return rc
+    if args.json:
+        print(json.dumps(summary, indent=2))
+    else:
+        _print_report_human(summary)
+    return rc
 
 
 def cmd_drc(args):
     extra = ["--schematic-parity"] if args.parity else []
-    extra += ["--refill-zones", "--save-board"]
-    return _run_report("drc", args.board, extra)
+    # Zone refill rewrites the board file, so it only happens on explicit
+    # --save-board. A verification command must not mutate its input.
+    if args.save_board:
+        extra += ["--refill-zones", "--save-board"]
+    summary, rc = _summarize_report("drc", args.board, extra)
+    if summary is None:
+        return rc
+    if args.json:
+        print(json.dumps(summary, indent=2))
+    else:
+        _print_report_human(summary)
+    return rc
 
 
-def cmd_netlist(args):
-    out = Path(str(args.project).rsplit(".", 1)[0] + "-netlist.sexpr")
-    proc = kicad_cli(["sch", "export", "netlist", str(args.project),
+# ---------------------------------------------------------------- netlist
+
+def _netlist_path(project):
+    return Path(str(project).rsplit(".", 1)[0] + "-netlist.sexpr")
+
+
+def _export_netlist(project):
+    """Export the netlist for project. Returns (path, exit_code)."""
+    out = _netlist_path(project)
+    proc = kicad_cli(["sch", "export", "netlist", str(project),
                       "-o", str(out), "--format", "kicadsexpr"])
     if proc.returncode != 0:
         print(proc.stderr, file=sys.stderr)
-        return EXIT_ENV
+        return out, EXIT_ENV
+    return out, EXIT_OK
+
+
+def cmd_netlist(args):
+    out, rc = _export_netlist(args.project)
+    if rc != EXIT_OK:
+        return rc
     print(out)
     return EXIT_OK
 
 
-def _load_nets(project):
-    netlist = Path(str(project).rsplit(".", 1)[0] + "-netlist.sexpr")
-    fresh = False
+def _cache_is_stale(netlist, project):
+    """True if the cached netlist is absent or older than the schematic."""
     if not netlist.exists():
-        r = cmd_netlist(type("A", (), {"project": project})())
-        if r != EXIT_OK:
-            sys.exit(r)
+        return True
+    if not Path(project).exists():
+        return False
+    return netlist.stat().st_mtime < Path(project).stat().st_mtime
+
+
+def _load_nets(project, refresh=False):
+    """Load (nets, values, footprints, freshly_exported) for a project.
+
+    Reuses the cached netlist only while it is newer than the schematic;
+    regenerates automatically when the schematic changed, and always when
+    refresh is set (--refresh).
+    """
+    project = Path(project)
+    netlist = _netlist_path(project)
+    fresh = False
+    if refresh or _cache_is_stale(netlist, project):
+        out, rc = _export_netlist(project)
+        if rc != EXIT_OK:
+            sys.exit(rc)
         fresh = True
     root = load_sexp(netlist)
     nets_node = sexp_get(root, "nets") or sexp_get(root[0], "nets")
@@ -233,7 +308,7 @@ def _first_str(node):
 
 
 def cmd_nets(args):
-    nets, _, _, fresh = _load_nets(args.project)
+    nets, _, _, fresh = _load_nets(args.project, refresh=args.refresh)
     print(f"# {'(regenerated)' if fresh else '(cached)'} "
           f"{len(nets)} nets; use --refresh to force re-export")
     for name in sorted(nets, key=str.lower):
@@ -243,7 +318,7 @@ def cmd_nets(args):
 
 
 def cmd_pins(args):
-    nets, values, footprints, _ = _load_nets(args.project)
+    nets, values, footprints, _ = _load_nets(args.project, refresh=args.refresh)
     ref = args.ref
     pin2net = {}
     for name, nodes in nets.items():
@@ -251,8 +326,9 @@ def cmd_pins(args):
             if r == ref:
                 pin2net[p] = net
     if not pin2net:
-        print(f"No connected pins found for '{ref}'. Check the reference.")
-        return EXIT_VIOLATIONS
+        print(f"ERROR: no connected pins found for '{ref}'. Check the reference.",
+              file=sys.stderr)
+        return EXIT_ENV
     print(f"{ref}  value={values.get(ref, '?')}  footprint={footprints.get(ref, '?')}")
     for pin in sorted(pin2net, key=_pin_sort):
         print(f"  pin {pin:<6} -> {pin2net[pin]}")
@@ -265,7 +341,7 @@ def _pin_sort(p):
 
 
 def cmd_check_intent(args):
-    nets, _, _, _ = _load_nets(args.project)
+    nets, _, _, _ = _load_nets(args.project, refresh=args.refresh)
     bad = 0
     with open(args.csv, encoding="utf-8-sig", newline="") as fh:
         rows = list(csv.DictReader(fh))
@@ -273,7 +349,7 @@ def cmd_check_intent(args):
     if rows and not required.issubset(rows[0]):
         print(f"CSV must have columns {sorted(required)}")
         return EXIT_ENV
-    print(f"{'ref':<8}{'pin':<7}{'expected':<18}{'actual':<18}result")
+    results = []
     for row in rows:
         ref, pin, want = row["ref"].strip(), row["pin"].strip(), row["expected_net"].strip()
         actual = None
@@ -289,16 +365,33 @@ def cmd_check_intent(args):
         else:
             status = "WRONG"
             bad += 1
-        mark = " " if status == "ok" else "*"
-        print(f"{mark}{ref:<7}{pin:<7}{want:<18}{str(actual):<18}{status}")
+        results.append({"ref": ref, "pin": pin, "expected": want,
+                        "actual": actual, "status": status})
+    orphans = _orphan_nets(nets) if args.orphans else []
+    bad += len(orphans)
     total = len(rows)
+    verified = total - sum(1 for r in results if r["status"] != "ok")
+    if args.json:
+        print(json.dumps({
+            "command": "check-intent",
+            "target": str(args.project),
+            "results": results,
+            "orphans": [{"net": n, "ref": r, "pin": p} for n, r, p in orphans],
+            "verified": verified,
+            "total": total,
+        }, indent=2))
+        return EXIT_VIOLATIONS if bad else EXIT_OK
+    print(f"{'ref':<8}{'pin':<7}{'expected':<18}{'actual':<18}result")
+    for res in results:
+        mark = " " if res["status"] == "ok" else "*"
+        print(f"{mark}{res['ref']:<7}{res['pin']:<7}{res['expected']:<18}"
+              f"{str(res['actual']):<18}{res['status']}")
     if args.orphans:
-        orphans = _orphan_nets(nets)
         for name, ref, pin in orphans:
             print(f"{name:<24} {ref}.{pin}  ORPHAN (single-pin net)")
             bad += 1
         print(f"\n{len(orphans)} orphan net(s)")
-    print(f"\n{total - bad}/{total} connections verified")
+    print(f"\n{verified}/{total} connections verified")
     return EXIT_VIOLATIONS if bad else EXIT_OK
 
 
@@ -362,11 +455,14 @@ def cmd_lint(args):
             val = _first_str(lab)
             if val:
                 label_counts[(kind, val)] = label_counts.get((kind, val), 0) + 1
+    nets = None
+    connectivity_skipped = False
     try:
         nets, _, _, _ = _load_nets(args.project)
     except SystemExit:
-        print("LINT: skipped connectivity checks (netlist export failed)")
-        nets = None
+        connectivity_skipped = True
+        if not args.json:
+            print("LINT: skipped connectivity checks (netlist export failed)")
     if nets is not None:
         for (kind, val), count in sorted(label_counts.items(), key=lambda kv: str(kv[0])):
             net = _label_net(val, nets)
@@ -377,12 +473,77 @@ def cmd_lint(args):
         for name, ref, pin in _orphan_nets(nets):
             problems.append(f"net '{name}' has a single connection "
                             f"({ref}.{pin}) - dangling?")
+    if args.json:
+        doc = {"command": "lint", "target": str(args.project), "problems": problems}
+        if connectivity_skipped:
+            doc["note"] = "connectivity checks skipped (netlist export failed)"
+        print(json.dumps(doc, indent=2))
+        return EXIT_VIOLATIONS if problems else EXIT_OK
     if problems:
         for p in problems:
             print(f"LINT: {p}")
         print(f"\n{len(problems)} lint problem(s)")
         return EXIT_VIOLATIONS
     print(f"Lint clean ({len(refs)} symbols)")
+    return EXIT_OK
+
+
+def cmd_check_rules(args):
+    nets, _, _, _ = _load_nets(args.project, refresh=args.refresh)
+    with open(args.rules, encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        required = {"rule", "net", "params"}
+        if reader.fieldnames is None or not required.issubset(reader.fieldnames):
+            print(f"ERROR: rules CSV must have columns {sorted(required)}",
+                  file=sys.stderr)
+            return EXIT_ENV
+        rules = [(row["rule"].strip(), row["net"].strip(), row["params"].strip())
+                 for row in reader if row["rule"].strip()]
+    violations = []
+    for rule, net, params in rules:
+        nodes = nets.get(net, {})
+        if rule == "min-contacts":
+            try:
+                minimum = int(params)
+            except ValueError:
+                print(f"ERROR: min-contacts params must be an integer, "
+                      f"got '{params}' (net {net})", file=sys.stderr)
+                return EXIT_ENV
+            if len(nodes) < minimum:
+                violations.append({
+                    "rule": rule, "net": net,
+                    "detail": f"{len(nodes)} connection(s), need >= {minimum}",
+                })
+        elif rule == "net-exclusive":
+            allowed = set(params.replace(",", " ").split())
+            if not nodes:
+                violations.append({"rule": rule, "net": net,
+                                   "detail": "net not found in netlist"})
+                continue
+            for (ref, pin) in sorted(nodes):
+                if ref not in allowed:
+                    violations.append({
+                        "rule": rule, "net": net,
+                        "detail": f"{ref}.{pin} connected but only "
+                                  f"{sorted(allowed)} allowed",
+                    })
+        else:
+            print(f"ERROR: unknown rule type '{rule}' (net {net})", file=sys.stderr)
+            return EXIT_ENV
+    if args.json:
+        print(json.dumps({
+            "command": "check-rules",
+            "target": str(args.project),
+            "checked": len(rules),
+            "violations": violations,
+        }, indent=2))
+        return EXIT_VIOLATIONS if violations else EXIT_OK
+    for v in violations:
+        print(f"RULE FAIL: [{v['rule']}] {v['net']}: {v['detail']}")
+    if violations:
+        print(f"\n{len(violations)} rule violation(s)")
+        return EXIT_VIOLATIONS
+    print(f"All {len(rules)} rule(s) pass")
     return EXIT_OK
 
 
@@ -396,7 +557,7 @@ def cmd_render(args):
             target = str(outdir / (stem + ".svg"))
             sub = kicad_cli(["pcb", "export", "svg", str(path), "-o", target,
                              "--layers", "F.Cu,B.Cu,F.Mask,B.Mask,"
-                                         "F.Silkscreen,B.Silkscreen,Edge.Cuts"])
+                                          "F.Silkscreen,B.Silkscreen,Edge.Cuts"])
         else:
             # sch export svg writes one file per sheet into the -o directory
             target = str(outdir / (stem + "-sch"))
@@ -433,11 +594,17 @@ def main(argv=None):
 
     p = sub.add_parser("erc", help="run ERC on a schematic")
     p.add_argument("project")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable JSON output")
     p.set_defaults(func=cmd_erc)
 
     p = sub.add_parser("drc", help="run DRC on a board")
     p.add_argument("board")
     p.add_argument("--parity", action="store_true", help="check schematic parity")
+    p.add_argument("--save-board", dest="save_board", action="store_true",
+                   help="refill zones and rewrite the board file (default: off)")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable JSON output")
     p.set_defaults(func=cmd_drc)
 
     p = sub.add_parser("netlist", help="export netlist")
@@ -461,11 +628,23 @@ def main(argv=None):
     p.add_argument("--refresh", action="store_true")
     p.add_argument("--orphans", action="store_true",
                    help="also flag single-pin nets as violations")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable JSON output")
     p.set_defaults(func=cmd_check_intent)
 
     p = sub.add_parser("lint", help="structural schematic checks")
     p.add_argument("project")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable JSON output")
     p.set_defaults(func=cmd_lint)
+
+    p = sub.add_parser("check-rules", help="verify house-style rules from a CSV")
+    p.add_argument("project")
+    p.add_argument("rules", help="rules CSV (see docs/rules.md)")
+    p.add_argument("--refresh", action="store_true")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable JSON output")
+    p.set_defaults(func=cmd_check_rules)
 
     p = sub.add_parser("render", help="export SVG renders")
     p.add_argument("projects", nargs="+")
@@ -477,11 +656,6 @@ def main(argv=None):
     p.set_defaults(func=cmd_bom)
 
     args = ap.parse_args(argv)
-
-    if getattr(args, "refresh", False):
-        nl = Path(str(args.project).rsplit(".", 1)[0] + "-netlist.sexpr")
-        if nl.exists():
-            nl.unlink()
 
     try:
         return args.func(args)
