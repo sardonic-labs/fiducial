@@ -34,8 +34,8 @@ python fiducial/scripts/fiducial.py <command>
 | `netlist <project.kicad_sch>` | Export netlist to `<project>-netlist.sexpr` |
 | `nets <project.kicad_sch>` | Dump every net with its connected pins |
 | `pins <project.kicad_sch> <REF>` | Dump one symbol's pins and their nets |
-| `check-intent <project.kicad_sch> intent.csv` | Compare expected connections (`ref,pin,expected_net`) against reality |
-| `lint <project.kicad_sch>` | Structural checks: duplicate refs, missing fields, unconnected pins |
+| `check-intent <project.kicad_sch> intent.csv` | Compare expected connections (`ref,pin,expected_net`) against reality; `--orphans` also flags single-pin nets |
+| `lint <project.kicad_sch>` | Structural checks: duplicate refs, missing fields, unconnected pins, single-use labels, dangling nets |
 | `render <project...> --outdir DIR` | Export SVG renders of schematic and/or PCB so you can look at them |
 | `bom <project.kicad_sch>` | Export CSV bill of materials |
 

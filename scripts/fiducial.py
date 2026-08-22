@@ -291,8 +291,32 @@ def cmd_check_intent(args):
         mark = " " if status == "ok" else "*"
         print(f"{mark}{ref:<7}{pin:<7}{want:<18}{str(actual):<18}{status}")
     total = len(rows)
+    if args.orphans:
+        orphans = _orphan_nets(nets)
+        for name, ref, pin in orphans:
+            print(f"{name:<24} {ref}.{pin}  ORPHAN (single-pin net)")
+            bad += 1
+        print(f"\n{len(orphans)} orphan net(s)")
     print(f"\n{total - bad}/{total} connections verified")
     return EXIT_VIOLATIONS if bad else EXIT_OK
+
+
+def _orphan_nets(nets):
+    """Nets with exactly one connected pin that are not explicit no-connects."""
+    out = []
+    for name, nodes in sorted(nets.items()):
+        if len(nodes) == 1 and not name.startswith("unconnected"):
+            ((ref, pin), _) = list(nodes.items())[0]
+            out.append((name, ref, pin))
+    return out
+
+
+def _label_net(val, nets):
+    """Net a sheet label merges into, or None."""
+    for cand in ("/" + val, val):
+        if cand in nets:
+            return cand
+    return None
 
 
 def cmd_lint(args):
@@ -331,6 +355,27 @@ def cmd_lint(args):
         if uid in seen_uuids:
             problems.append(f"duplicate uuid: {uid}")
         seen_uuids[uid] = True
+    label_counts = {}
+    for kind in ("label", "global_label", "hierarchical_label"):
+        for lab in sexp_find_all(root, kind):
+            val = _first_str(lab)
+            if val:
+                label_counts[(kind, val)] = label_counts.get((kind, val), 0) + 1
+    try:
+        nets, _, _, _ = _load_nets(args.project)
+    except SystemExit:
+        print("LINT: skipped connectivity checks (netlist export failed)")
+        nets = None
+    if nets is not None:
+        for (kind, val), count in sorted(label_counts.items(), key=lambda kv: str(kv[0])):
+            net = _label_net(val, nets)
+            merged = net is not None and len(nets[net]) > 1
+            if count == 1 and not merged:
+                problems.append(f"{kind} '{val}' appears only once and does not "
+                                f"join any multi-pin net - likely a typo")
+        for name, ref, pin in _orphan_nets(nets):
+            problems.append(f"net '{name}' has a single connection "
+                            f"({ref}.{pin}) - dangling?")
     if problems:
         for p in problems:
             print(f"LINT: {p}")
@@ -413,6 +458,8 @@ def main(argv=None):
     p.add_argument("project")
     p.add_argument("csv")
     p.add_argument("--refresh", action="store_true")
+    p.add_argument("--orphans", action="store_true",
+                   help="also flag single-pin nets as violations")
     p.set_defaults(func=cmd_check_intent)
 
     p = sub.add_parser("lint", help="structural schematic checks")

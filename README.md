@@ -43,6 +43,17 @@ mechanical verification:
 git submodule update --remote fiducial
 ```
 
+## Testing
+
+```sh
+python -m unittest discover -s tests -v
+```
+
+The suite runs against a real AI-authored RP2040 devboard fixture with two
+planted connectivity bugs (floating crystal caps, missing SWD header) and
+asserts the tools catch both while ERC stays deceptively clean. Connectivity
+tests are skipped if `kicad-cli` is not installed.
+
 ## Name
 
 A fiducial is the reference mark assembly machines align to. This repo is the

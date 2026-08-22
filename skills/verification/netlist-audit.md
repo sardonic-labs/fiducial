@@ -29,7 +29,18 @@ python fiducial/scripts/fiducial.py check-intent <project.kicad_sch> intent.csv
 Exit code 0 = every expected connection verified. Any `MISSING` or `WRONG`
 row is a bug: fix the schematic, not the CSV (unless the CSV was wrong).
 
-## Step 3 — Spot-check critical parts
+## Step 3 — Structural sweep
+
+`lint` now also catches two connectivity smells mechanically:
+
+- **single-use labels** that don't join any multi-pin net (the classic
+  "cap labeled /XIN but crystal wired to Net-(U1-XIN)" bug),
+- **orphan nets** with exactly one connected pin.
+
+You can get the orphan list with intent scoring via
+`check-intent <project> <csv> --orphans`.
+
+## Step 4 — Spot-check critical parts
 
 ```
 python fiducial/scripts/fiducial.py pins <project.kicad_sch> U1
