@@ -494,5 +494,37 @@ class TestCheckRules(OfflineTest):
                          "J1.1 connected but only ['EPS1'] allowed")
 
 
+class TestExamples(unittest.TestCase):
+    """The shipped example CSVs must stay valid against the test fixture."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="fiducial-examples-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        proj = self.tmp / "healthy.kicad_sch"
+        shutil.copy(FIXTURES / "healthy.kicad_sch", proj)
+        nl = fid._netlist_path(proj)
+        nl.write_text(NETLIST_HEALTHY, encoding="utf-8")
+        st = proj.stat()
+        os.utime(nl, (st.st_mtime + 100,) * 2)
+        self.proj = proj
+
+    def run_main(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = fid.main(list(argv))
+        return rc, out.getvalue(), err.getvalue()
+
+    def test_examples_intent_csv_all_ok(self):
+        csvp = ROOT / "examples" / "intent.csv"
+        rc, out, _ = self.run_main("check-intent", str(self.proj), str(csvp))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("8/8 connections verified", out)
+
+    def test_examples_rules_csv_pass(self):
+        rules = ROOT / "examples" / "rules.csv"
+        rc, out, _ = self.run_main("check-rules", str(self.proj), str(rules))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+
+
 if __name__ == "__main__":
     unittest.main()

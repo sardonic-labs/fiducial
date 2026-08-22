@@ -1,0 +1,7 @@
+rule,net,params
+min-contacts,/A,2
+min-contacts,/B,2
+min-contacts,/VCC,2
+min-contacts,/GND,2
+net-exclusive,/VCC,U1 C1
+net-exclusive,/GND,U1 C1
