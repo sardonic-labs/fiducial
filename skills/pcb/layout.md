@@ -3,6 +3,21 @@
 Read before placing or routing. Assumes schematic passed ERC and the
 connectivity audit.
 
+## Agents: do NOT write autorouters
+
+If PCB work is requested and no human-driven interactive routing is possible,
+prefer explicit, deterministic routing over any generated search:
+
+- Plan placement so nets do not need to cross; dedicate escape lanes per pin
+  group at fixed pitch (e.g. one column per connector signal).
+- Emit explicit track polylines in those lanes; verify with `drc`.
+- A hand-rolled maze/autorouter will fail unpredictably (congestion sealing,
+  marking collisions) and burn enormous time. This has been tried and it does
+  not converge within an agent session.
+- If a board genuinely needs autorouting, say so and stop - that is a
+  human decision involving external tools (e.g. FreeRouting), not something
+  to improvise in Python.
+
 ## Placement order
 
 1. **Fix connectors and mounting holes first** — they are constrained by the

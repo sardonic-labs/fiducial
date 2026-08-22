@@ -177,6 +177,7 @@ def cmd_erc(args):
 
 def cmd_drc(args):
     extra = ["--schematic-parity"] if args.parity else []
+    extra += ["--refill-zones", "--save-board"]
     return _run_report("drc", args.board, extra)
 
 
