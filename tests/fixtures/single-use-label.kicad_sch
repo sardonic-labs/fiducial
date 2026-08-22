@@ -1,0 +1,105 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(uuid f2000000-0000-0000-0000-000000000001)
+	(paper "A4")
+	(title_block
+		(title "Fiducial offline test board - single-use label")
+		(rev "A")
+	)
+	(lib_symbols
+		(symbol "Device:R"
+			(property "Reference" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+		)
+		(symbol "Device:C"
+			(property "Reference" "C"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "C"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+		)
+		(symbol "Test:MCU"
+			(property "Reference" "U"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "MCU"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(uuid f2000000-0000-0000-0000-000000000010)
+		(at 50 50 0)
+		(property "Reference" "R1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "10k"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "R1") (unit 1))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C")
+		(uuid f2000000-0000-0000-0000-000000000011)
+		(at 80 50 0)
+		(property "Reference" "C1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "100n"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "C1") (unit 1))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Test:MCU")
+		(uuid f2000000-0000-0000-0000-000000000012)
+		(at 120 50 0)
+		(property "Reference" "U1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "TestMCU"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "U1") (unit 1))
+			)
+		)
+	)
+	(label "/A" (at 10 10 0))
+	(label "/A" (at 20 10 0))
+	(label "/B" (at 10 15 0))
+	(label "/B" (at 20 15 0))
+	(label "/VCC" (at 10 20 0))
+	(label "/VCC" (at 20 20 0))
+	(label "/GND" (at 10 25 0))
+	(label "/GND" (at 20 25 0))
+	(label "TYPO" (at 30 30 0))
+)

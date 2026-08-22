@@ -1,0 +1,60 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(uuid f1000000-0000-0000-0000-000000000001)
+	(paper "A4")
+	(title_block
+		(title "Fiducial offline test board - duplicate reference")
+		(rev "A")
+	)
+	(lib_symbols
+		(symbol "Device:R"
+			(property "Reference" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(uuid f1000000-0000-0000-0000-000000000010)
+		(at 50 50 0)
+		(property "Reference" "R1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "10k"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "R1") (unit 1))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(uuid f1000000-0000-0000-0000-000000000011)
+		(at 90 50 0)
+		(property "Reference" "R1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "22k"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "R1") (unit 1))
+			)
+		)
+	)
+	(label "/A" (at 10 10 0))
+	(label "/A" (at 20 10 0))
+)

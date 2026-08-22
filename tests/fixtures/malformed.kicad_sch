@@ -1,0 +1,7 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(uuid f3000000-0000-0000-0000-000000000001)
+	(paper "A4")
+	(title_block
+		(title "Fiducial offline test board - malformed S-expression"
