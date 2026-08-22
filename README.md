@@ -145,6 +145,16 @@ MIT — see [LICENSE](LICENSE).
 A fiducial is the reference mark assembly machines align to. This repo is the
 reference point that keeps AI-generated hardware aligned with reality.
 
+## Roadmap
+
+- **Footprint/symbol resolution** — `scripts/find_part.py` + the
+  [footprints skill](skills/reference/footprints.md) search local and system
+  libraries by name; deeper LCSC/JLC catalog integration later
+- **Rules profiles** — reusable house-style standards (e.g., a satellite pin
+  standard) as loadable rule sets beyond per-board `rules.csv`
+- **Next domains: mechanical CAD (Fusion/FreeCAD/Onshape)** — same
+  architecture: spec-as-code rules plus a verification harness
+
 ## Status
 
 v0 — battle-tested on one real board (RP2040 devboard), schematic side only.
