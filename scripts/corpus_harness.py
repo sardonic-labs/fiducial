@@ -98,26 +98,31 @@ def find_schematics(root, subdir):
 
 
 def run_tool(cmd_args, timeout=TIMEOUT_SECONDS):
-    """Run one fiducial command. Returns (crashed, detail)."""
+    """Run one fiducial command. Returns (verdict, detail).
+
+    Verdicts: ok (clean), findings (tool ran, reported issues -- expected
+    on foreign hardware), unloadable (KiCad itself refused the file --
+    a corpus-file property, not a fiducial bug), crash (traceback,
+    timeout, or other hard error).
+    """
     try:
         r = sh([sys.executable, FIDUCIAL] + cmd_args, timeout=timeout)
     except subprocess.TimeoutExpired:
-        return True, "TIMEOUT after %ss" % timeout
+        return "crash", "TIMEOUT after %ss" % timeout
     out = (r.stdout or "") + (r.stderr or "")
-    crashed = False
-    detail = ""
-    # Findings are fine; crashes and hard errors are not. ERC exit code 1
-    # means findings, which is acceptable on foreign hardware.
     if "Traceback" in out:
-        crashed = True
-        detail = "traceback"
-    elif cmd_args[0] != "erc" and r.returncode == 2:
-        crashed = True
-        detail = "exit 2 (environment/config): %s" % out.strip()[-200:]
-    elif r.returncode not in (0, 1):
-        crashed = True
-        detail = "exit %d: %s" % (r.returncode, out.strip()[-200:])
-    return crashed, detail
+        return "crash", "traceback"
+    if r.returncode == 0:
+        return "ok", ""
+    if r.returncode == 1:
+        # ERC/DRC findings are legitimate results on foreign boards.
+        return "findings", ""
+    if r.returncode == 2 and "Failed to load" in out:
+        return "unloadable", "kicad-cli cannot open this file"
+    return "crash", "exit %d: %s" % (r.returncode, out.strip()[-200:])
+
+
+VERDICT_ORDER = {"ok": 0, "findings": 1, "unloadable": 2, "crash": 3}
 
 
 def effective_commands():
@@ -169,18 +174,18 @@ def main():
                 continue
             for sch in schs:
                 rel = os.path.relpath(sch, dest)
-                entry_crash = False
+                worst = "ok"
                 details = []
                 for cmd in cmds:
-                    crashed, detail = run_tool([cmd, sch])
-                    if crashed:
-                        entry_crash = True
+                    verdict, detail = run_tool([cmd, sch])
+                    if VERDICT_ORDER[verdict] > VERDICT_ORDER[worst]:
+                        worst = verdict
+                    if detail:
                         details.append("%s: %s" % (cmd, detail))
-                verdict = "CRASH" if entry_crash else "ok"
                 detail = "; ".join(details)
-                print("   %-6s %s %s" % (verdict, rel, ("-- " + detail) if detail else ""))
-                results.append((name, rel, verdict, detail))
-                if entry_crash:
+                print("   %-10s %s %s" % (worst, rel, ("-- " + detail) if detail else ""))
+                results.append((name, rel, worst, detail))
+                if worst == "crash":
                     status = 1
     finally:
         write_report(results)
