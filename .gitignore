@@ -5,3 +5,4 @@ __pycache__/
 render/
 
 corpus/CORPUS_REPORT.md
+examples/*-netlist.sexpr

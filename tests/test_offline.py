@@ -495,15 +495,20 @@ class TestCheckRules(OfflineTest):
 
 
 class TestExamples(unittest.TestCase):
-    """The shipped example CSVs must stay valid against the test fixture."""
+    """The shipped example CSVs must stay valid against the demo board.
+
+    The demo board is a real RP2040 devboard schematic; its netlist export
+    is committed as fixtures/demo-board-netlist.sexpr so this test stays
+    offline while validating against real connectivity data.
+    """
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="fiducial-examples-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        proj = self.tmp / "healthy.kicad_sch"
-        shutil.copy(FIXTURES / "healthy.kicad_sch", proj)
+        proj = self.tmp / "demo-board.kicad_sch"
+        shutil.copy(ROOT / "examples" / "demo-board.kicad_sch", proj)
         nl = fid._netlist_path(proj)
-        nl.write_text(NETLIST_HEALTHY, encoding="utf-8")
+        shutil.copy(FIXTURES / "demo-board-netlist.sexpr", nl)
         st = proj.stat()
         os.utime(nl, (st.st_mtime + 100,) * 2)
         self.proj = proj
@@ -518,7 +523,7 @@ class TestExamples(unittest.TestCase):
         csvp = ROOT / "examples" / "intent.csv"
         rc, out, _ = self.run_main("check-intent", str(self.proj), str(csvp))
         self.assertEqual(rc, fid.EXIT_OK, out)
-        self.assertIn("8/8 connections verified", out)
+        self.assertIn("11/11 connections verified", out)
 
     def test_examples_rules_csv_pass(self):
         rules = ROOT / "examples" / "rules.csv"
