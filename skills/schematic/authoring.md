@@ -3,6 +3,15 @@
 `.kicad_sch` files are S-expressions. KiCad is forgiving on read but strict on
 structure — a malformed file can silently lose symbols. Follow these rules.
 
+This file covers *mechanics*. For process and standards, read also:
+
+- [authoring-workflow.md](authoring-workflow.md) — the block loop: intent
+  first, verify, reconcile debris, declare done
+- [cleanliness.md](cleanliness.md) — what "clean" means, mechanically
+- [hierarchy.md](hierarchy.md) — organizing multi-block designs into sheets
+- [power-parts-selection.md](power-parts-selection.md) — dissipation and
+  margin math for anything in the power path
+
 ## Before editing
 
 - Read the relevant section of the file first. Never edit from memory.
