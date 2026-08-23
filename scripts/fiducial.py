@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from argparse import Namespace
 from pathlib import Path
 
 EXIT_OK = 0
@@ -468,6 +469,42 @@ def _orphan_clusters(nets):
     return flagged
 
 
+def _suspect_components(nets):
+    """Components tacked onto a real circuit without participating in it.
+
+    A ghost from an abandoned iteration often survives because ONE of its
+    pins taps a live net (Q1.2 on VBAT_FUSED, 2026-08-23), which defeats
+    island detection: the graph looks connected. The signature instead:
+    a small part (not a connector, not an IC, < 4 connected pins) whose
+    every non-rail net is dangling or point-to-point (<= 2 connections),
+    with at least one dangling pin.
+
+    Review-level finding: some legitimate circuits (high-impedance sense
+    taps) look like this; the message asks for review, not deletion.
+    """
+    pin_counts = {}
+    for name, nodes in nets.items():
+        for (r, _p) in nodes:
+            pin_counts[r] = pin_counts.get(r, 0) + 1
+    suspects = []
+    for r in sorted(pin_counts):
+        if r.upper().startswith(("J", "U")) or pin_counts[r] >= 4:
+            continue
+        own = [(name, len(nodes)) for name, nodes in nets.items()
+               if any(rr == r for (rr, _p) in nodes)]
+        non_rail = [(n, c) for n, c in own if not _is_rail_net(n)]
+        if not non_rail:
+            continue
+        has_dangling = any(c == 1 for n, c in non_rail if not n.startswith("unconnected"))
+        # At most one substantial net = at most a passive tap into the real
+        # circuit. Parts that BRIDGE two or more substantial nets (R-GS
+        # bridging VBAT_GATE and VBAT_SW) are participants, not ghosts.
+        taps_at_most_one = sum(1 for _n, c in non_rail if c >= 3) <= 1
+        if has_dangling and taps_at_most_one:
+            suspects.append(r)
+    return suspects
+
+
 _GRID_MM = 1.27  # KiCad default schematic placement grid (50 mil)
 _GRID_TOL = 0.01
 
@@ -595,6 +632,10 @@ def cmd_lint(args):
             problems.append("isolated cluster without connector or IC: "
                             + ", ".join(cluster)
                             + " - leftover from an earlier iteration?")
+        for ref in _suspect_components(nets):
+            problems.append(f"{ref}: suspect tacked-on component (all nets "
+                            f"dangling or point-to-point) - review, likely "
+                            f"leftover from an earlier iteration")
     if args.json:
         doc = {"command": "lint", "target": str(args.project), "problems": problems}
         if connectivity_skipped:
@@ -731,7 +772,8 @@ def cmd_check(args):
     else:
         print("== erc: skipped (--skip-erc) ==")
     if args.intent:
-        run("check-intent", lambda: cmd_check_intent(args))
+        run("check-intent", lambda: cmd_check_intent(
+            Namespace(**{**vars(args), "csv": args.intent})))
     if args.rules:
         run("check-rules", lambda: cmd_check_rules(args))
     verdict = {EXIT_OK: "PASS", EXIT_VIOLATIONS: "FINDINGS", EXIT_ENV: "ENV-ERROR"}.get(

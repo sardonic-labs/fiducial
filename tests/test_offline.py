@@ -566,6 +566,29 @@ class TestOrphanClusters(unittest.TestCase):
         nets = {"GND": {("R9", "2"): "GND"}, "LONELY": {("R9", "1"): "LONELY"}}
         self.assertEqual(fid._orphan_clusters(nets), [])
 
+    def test_tacked_on_ghost_with_live_tap_caught_by_suspect_check(self):
+        # The real 2026-08-23 signature: Q1.2 taps the LIVE fuse node, so
+        # island detection sees one connected graph and blesses it. The
+        # suspect-component check must catch Q1 via its dangling pin and
+        # point-to-point nets, while the legit chain (F1, Q-VBAT, Q2,
+        # R-GS, R-PD, R-EN - parts with a >=3-connection net) stays clean.
+        nets = {
+            "GND": {("J-BT", "2"): "GND", ("Q2", "S"): "GND",
+                    ("R-PD", "2"): "GND", ("RG1", "1"): "GND"},
+            "BT_IN_P": {("J-BT", "1"): "BT_IN_P", ("F1", "2"): "BT_IN_P"},
+            "VBAT_FUSED": {("F1", "1"): "VBAT_FUSED", ("F-VBAT", "1"): "VBAT_FUSED",
+                           ("Q1", "2"): "VBAT_FUSED"},
+            "VBAT_SW": {("F-VBAT", "2"): "VBAT_SW", ("Q-VBAT", "3"): "VBAT_SW",
+                        ("R-GS", "2"): "VBAT_SW"},
+            "VBAT_GATE": {("Q-VBAT", "1"): "VBAT_GATE", ("Q2", "D"): "VBAT_GATE",
+                          ("R-GS", "1"): "VBAT_GATE"},
+            "EN_VBAT_N": {("Q2", "G"): "EN_VBAT_N", ("R-EN", "2"): "EN_VBAT_N",
+                          ("R-PD", "1"): "EN_VBAT_N"},
+            "BT_GATE_N": {("Q1", "1"): "BT_GATE_N", ("RG1", "2"): "BT_GATE_N"},
+            "VBAT": {("Q1", "3"): "VBAT"},
+        }
+        self.assertEqual(fid._suspect_components(nets), ["Q1"])
+
 
 class TestLintGeometry(unittest.TestCase):
     def setUp(self):
