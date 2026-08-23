@@ -1,7 +1,7 @@
 rule,net,params
-min-contacts,/A,2
-min-contacts,/B,2
-min-contacts,/VCC,2
-min-contacts,/GND,2
-net-exclusive,/VCC,U1 C1
-net-exclusive,/GND,U1 C1
+min-contacts,GND,20
+min-contacts,+3V3,15
+min-contacts,/USB_DP,3
+min-contacts,/QSPI_SS,4
+net-exclusive,/USB_DP,U1 J1
+net-exclusive,/USB_DM,U1 J1

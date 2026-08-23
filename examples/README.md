@@ -7,9 +7,13 @@ Everything here matches `tests/fixtures/`, so CI keeps these honest.
 
 | File | Purpose |
 |---|---|
-| `demo-board.kicad_sch` | Minimal 4-net schematic (R1 pulls A and B; U1 consumes them) |
+| `demo-board.kicad_sch` | An excerpt of a real RP2040 devboard: USB-C, flash, crystal, regulators |
 | `intent.csv` | "These are the connections I meant to make" — audited by `check-intent` |
 | `rules.csv` | "This is what healthy looks like structurally" — audited by `check-rules` |
+
+Every row in both CSVs was derived from the board's actual netlist, so all
+checks pass as shipped. To see failures, change the schematic — or swap any
+expected net in `intent.csv` and watch the audit catch it.
 
 ## 5-minute walkthrough
 
@@ -19,7 +23,9 @@ With KiCad 8+ installed (`kicad-cli` on PATH):
 # 0. sanity check your environment
 python scripts/fiducial.py doctor
 
-# 1. structural lint (pure python, no KiCad needed)
+# 1. structural lint (pure python, no KiCad needed) — a devboard with
+#    intentionally unconnected GPIO pins will report dangling nets; that is
+#    the lint doing its job, not an error in this example
 python scripts/fiducial.py lint examples/demo-board.kicad_sch
 
 # 2. electrical rules check via KiCad
@@ -35,8 +41,9 @@ python scripts/fiducial.py check-rules examples/demo-board.kicad_sch examples/ru
 python scripts/fiducial.py nets examples/demo-board.kicad_sch
 ```
 
-All four checks exit `0` on this example. To see a failure, delete any row's
-connection from the schematic — or try the broken fixtures in `tests/fixtures/`
+All four checks exit `0` on this example (lint reports dangling-GPIO
+findings by design). To see failures, delete any row's connection from the
+schematic — or try the broken fixtures in `tests/fixtures/`
 (`duplicate-ref`, `single-use-label`, `malformed`) and watch each get caught.
 
 ## Why CSVs instead of config files?
