@@ -531,5 +531,106 @@ class TestExamples(unittest.TestCase):
         self.assertEqual(rc, fid.EXIT_OK, out)
 
 
+class TestOrphanClusters(unittest.TestCase):
+    """The 2026-08-23 battery-entry failure: Q1+RG1 were an abandoned gate
+    pull-down pair, fully connected to each other and to GND, so every
+    existing check blessed them. Cluster detection must flag them."""
+
+    def setUp(self):
+        self.nets = {
+            "GND": {("RG1", "1"): "GND", ("J1", "1"): "GND", ("R2", "2"): "GND"},
+            "BT_GATE_N": {("Q1", "1"): "BT_GATE_N", ("RG1", "2"): "BT_GATE_N"},
+            "VBAT": {("Q1", "3"): "VBAT"},
+            "MAIN": {("J1", "2"): "MAIN", ("R2", "1"): "MAIN",
+                     ("U1", "1"): "MAIN", ("U1", "2"): "MAIN",
+                     ("U1", "3"): "MAIN", ("U1", "4"): "MAIN"},
+        }
+
+    def test_abandoned_pull_down_pair_flagged(self):
+        clusters = fid._orphan_clusters(self.nets)
+        self.assertEqual(clusters, [["Q1", "RG1"]])
+
+    def test_anchored_cluster_not_flagged(self):
+        nets = dict(self.nets)
+        nets["BT_GATE_N"] = {("Q1", "1"): "BT_GATE_N", ("RG1", "2"): "BT_GATE_N",
+                             ("J9", "5"): "BT_GATE_N"}
+        self.assertEqual(fid._orphan_clusters(nets), [])
+
+    def test_rail_only_attachment_does_not_anchor(self):
+        # RG1 touches GND, but a rail is not an interface: the pair must
+        # still be flagged.
+        clusters = fid._orphan_clusters(self.nets)
+        self.assertIn(["Q1", "RG1"], clusters)
+
+    def test_lone_component_on_dangling_net_left_to_orphan_net_check(self):
+        nets = {"GND": {("R9", "2"): "GND"}, "LONELY": {("R9", "1"): "LONELY"}}
+        self.assertEqual(fid._orphan_clusters(nets), [])
+
+
+class TestLintGeometry(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="fiducial-geom-"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def _run_lint(self, text):
+        proj = self.tmp / "board.kicad_sch"
+        proj.write_text(text, encoding="utf-8")
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = fid.main(["lint", str(proj)])
+        return rc, out.getvalue(), err.getvalue()
+
+    def test_real_board_is_on_grid(self):
+        rc, out, _ = self._run_lint((FIXTURES / "rp2040-devboard.kicad_sch").read_text())
+        self.assertNotIn("off-grid", out)
+
+    def test_off_grid_symbol_detected(self):
+        text = (FIXTURES / "healthy.kicad_sch").read_text().replace(
+            "(at 81.28 50.8 0)", "(at 81.3 50.8 0)")
+        rc, out, _ = self._run_lint(text)
+        self.assertEqual(rc, fid.EXIT_VIOLATIONS)
+        self.assertIn("C1: symbol position off-grid (81.3, 50.8)", out)
+
+    def test_off_grid_wire_detected(self):
+        text = (FIXTURES / "healthy.kicad_sch").read_text()
+        # inject an off-grid wire (31.0 mm is not a multiple of 1.27 mm)
+        wire = "\n\t(wire (pts (xy 30.48 12.7) (xy 31.0 12.7)))\n"
+        text = text.rstrip()[:-1] + wire + ")"
+        rc, out, _ = self._run_lint(text)
+        self.assertIn("wire endpoint off-grid (31.0, 12.7)", out)
+
+
+class TestCheckGate(unittest.TestCase):
+    def test_gate_passes_healthy_board_without_kicad(self):
+        tmp = Path(tempfile.mkdtemp(prefix="fiducial-check-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        proj = tmp / "healthy.kicad_sch"
+        shutil.copy(FIXTURES / "healthy.kicad_sch", proj)
+        nl = fid._netlist_path(proj)
+        nl.write_text(NETLIST_HEALTHY, encoding="utf-8")
+        st = proj.stat()
+        os.utime(nl, (st.st_mtime + 100,) * 2)
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = fid.main(["check", str(proj), "--skip-erc"])
+        self.assertEqual(rc, fid.EXIT_OK, out.getvalue())
+        self.assertIn("== check: PASS ==", out.getvalue())
+
+    def test_gate_reports_findings(self):
+        tmp = Path(tempfile.mkdtemp(prefix="fiducial-check-"))
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        proj = tmp / "duplicate-ref.kicad_sch"
+        shutil.copy(FIXTURES / "duplicate-ref.kicad_sch", proj)
+        nl = fid._netlist_path(proj)
+        nl.write_text("(components)\n(nets)", encoding="utf-8")
+        st = proj.stat()
+        os.utime(nl, (st.st_mtime + 100,) * 2)
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = fid.main(["check", str(proj), "--skip-erc"])
+        self.assertEqual(rc, fid.EXIT_VIOLATIONS)
+        self.assertIn("== check: FINDINGS ==", out.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

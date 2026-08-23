@@ -42,7 +42,7 @@
 	(symbol
 		(lib_id "Device:R")
 		(uuid f0000000-0000-0000-0000-000000000010)
-		(at 50 50 0)
+		(at 50.8 50.8 0)
 		(property "Reference" "R1"
 			(at 0 0 0)
 			(effects (font (size 1.27 1.27)))
@@ -60,7 +60,7 @@
 	(symbol
 		(lib_id "Device:C")
 		(uuid f0000000-0000-0000-0000-000000000011)
-		(at 80 50 0)
+		(at 81.28 50.8 0)
 		(property "Reference" "C1"
 			(at 0 0 0)
 			(effects (font (size 1.27 1.27)))
@@ -78,7 +78,7 @@
 	(symbol
 		(lib_id "Test:MCU")
 		(uuid f0000000-0000-0000-0000-000000000012)
-		(at 120 50 0)
+		(at 121.92 50.8 0)
 		(property "Reference" "U1"
 			(at 0 0 0)
 			(effects (font (size 1.27 1.27)))
@@ -93,12 +93,12 @@
 			)
 		)
 	)
-	(label "/A" (at 10 10 0))
-	(label "/A" (at 20 10 0))
-	(label "/B" (at 10 15 0))
-	(label "/B" (at 20 15 0))
-	(label "/VCC" (at 10 20 0))
-	(label "/VCC" (at 20 20 0))
-	(label "/GND" (at 10 25 0))
-	(label "/GND" (at 20 25 0))
+	(label "/A" (at 12.7 12.7 0))
+	(label "/A" (at 20.32 12.7 0))
+	(label "/B" (at 12.7 15.24 0))
+	(label "/B" (at 20.32 15.24 0))
+	(label "/VCC" (at 12.7 20.32 0))
+	(label "/VCC" (at 20.32 20.32 0))
+	(label "/GND" (at 12.7 26.67 0))
+	(label "/GND" (at 20.32 26.67 0))
 )

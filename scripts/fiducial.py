@@ -405,6 +405,123 @@ def _orphan_nets(nets):
     return out
 
 
+_RAIL_NETS = {"GND", "VCC", "VDD", "VSS", "AGND", "DGND", "AVDD", "AVSS", "VBUS"}
+
+
+def _is_rail_net(name):
+    """Conservative power-rail heuristic. Rails are excluded from orphan-cluster
+    grouping because ground connects everything and would mask real islands.
+    Deliberately NOT matched: named rails like VBAT - a dangling VBAT net was
+    exactly the ghost this check exists to catch (2026-08-23)."""
+    n = name.strip().upper()
+    return n in _RAIL_NETS or n.startswith("+") or n.startswith("-")
+
+
+def _orphan_clusters(nets):
+    """Groups of components linked only to each other (plus power rails) with
+    no connector, no IC, and no >=4-pin part anchoring them to the outside
+    world. These are almost always leftovers from an earlier design iteration.
+
+    A cluster is flagged when it contains at least one multi-pin non-rail net
+    (so lone components on dangling nets are left to the orphan-net warning)
+    and has no anchor: J* connector, U* part, or any component with >= 4
+    connected pins.
+    """
+    comp_nets = {}
+    net_comps = {}
+    for name, nodes in nets.items():
+        if _is_rail_net(name):
+            continue
+        for (r, _p) in nodes:
+            comp_nets.setdefault(r, set()).add(name)
+            net_comps.setdefault(name, set()).add(r)
+    visited = set()
+    flagged = []
+    for start in sorted(comp_nets):
+        if start in visited:
+            continue
+        stack, cluster, cluster_nets = [start], set(), set()
+        while stack:
+            c = stack.pop()
+            if c in visited:
+                continue
+            visited.add(c)
+            cluster.add(c)
+            for n in comp_nets.get(c, ()):
+                cluster_nets.add(n)
+                for c2 in net_comps.get(n, ()):
+                    if c2 not in visited:
+                        stack.append(c2)
+        def _pin_count(r):
+            return sum(1 for nodes in nets.values() for (rr, _p) in nodes if rr == r)
+        anchored = any(
+            r.upper().startswith("J")
+            or r.upper().startswith("U")
+            or _pin_count(r) >= 4
+            for r in cluster
+        )
+        has_structure = any(
+            len(nets[n]) >= 2 for n in cluster_nets if not _is_rail_net(n)
+        )
+        if not anchored and has_structure:
+            flagged.append(sorted(cluster))
+    return flagged
+
+
+_GRID_MM = 1.27  # KiCad default schematic placement grid (50 mil)
+_GRID_TOL = 0.01
+
+
+def _on_grid(v):
+    return abs(v / _GRID_MM - round(v / _GRID_MM)) <= _GRID_TOL
+
+
+def _geometry_problems(root):
+    """Off-grid positions for symbol instances, wire endpoints, and labels."""
+    problems = []
+    for sym in [s for s in sexp_find_all(root, "symbol")
+                if any(isinstance(i, list) and i and i[0] == "instances" for i in s)]:
+        ref = None
+        for prop in sexp_find_all(sym, "property"):
+            if len(prop) >= 3 and prop[1] == "Reference":
+                ref = prop[2]
+        at = sexp_get(sym, "at")
+        if at is None or len(at) < 3:
+            continue
+        try:
+            x, y = float(at[1]), float(at[2])
+        except (TypeError, ValueError):
+            continue
+        if not (_on_grid(x) and _on_grid(y)):
+            problems.append(f"{ref or '?'}: symbol position off-grid ({x}, {y})")
+    off_wires = 0
+    for wire in sexp_find_all(root, "wire"):
+        for pt in sexp_find_all(wire, "xy"):
+            try:
+                x, y = float(pt[1]), float(pt[2])
+            except (TypeError, ValueError):
+                continue
+            if not (_on_grid(x) and _on_grid(y)):
+                off_wires += 1
+                if off_wires <= 10:
+                    problems.append(f"wire endpoint off-grid ({x}, {y})")
+    if off_wires > 10:
+        problems.append(f"... and {off_wires - 10} more off-grid wire endpoints")
+    for kind in ("label", "global_label", "hierarchical_label"):
+        for lab in sexp_find_all(root, kind):
+            val = _first_str(lab)
+            at = sexp_get(lab, "at")
+            if at is None or len(at) < 3:
+                continue
+            try:
+                x, y = float(at[1]), float(at[2])
+            except (TypeError, ValueError):
+                continue
+            if not (_on_grid(x) and _on_grid(y)):
+                problems.append(f"{kind} '{val}' off-grid ({x}, {y})")
+    return problems
+
+
 def _label_net(val, nets):
     """Net a sheet label merges into, or None."""
     for cand in ("/" + val, val):
@@ -463,6 +580,7 @@ def cmd_lint(args):
         connectivity_skipped = True
         if not args.json:
             print("LINT: skipped connectivity checks (netlist export failed)")
+    problems.extend(_geometry_problems(root))
     if nets is not None:
         for (kind, val), count in sorted(label_counts.items(), key=lambda kv: str(kv[0])):
             net = _label_net(val, nets)
@@ -473,6 +591,10 @@ def cmd_lint(args):
         for name, ref, pin in _orphan_nets(nets):
             problems.append(f"net '{name}' has a single connection "
                             f"({ref}.{pin}) - dangling?")
+        for cluster in _orphan_clusters(nets):
+            problems.append("isolated cluster without connector or IC: "
+                            + ", ".join(cluster)
+                            + " - leftover from an earlier iteration?")
     if args.json:
         doc = {"command": "lint", "target": str(args.project), "problems": problems}
         if connectivity_skipped:
@@ -586,6 +708,38 @@ def cmd_bom(args):
 
 # ---------------------------------------------------------------- main
 
+def cmd_check(args):
+    """Run the full verification gate in one invocation: lint, erc, and
+    optionally check-intent / check-rules. Exit code is the worst of the
+    parts, so CI and block-completion checks need one command only.
+    A sub-command crashing (e.g. netlist export without kicad-cli) counts
+    as ENV-ERROR for the gate rather than aborting it."""
+
+    def run(label, fn):
+        nonlocal worst
+        print(f"== {label} ==")
+        try:
+            rc = fn()
+        except SystemExit as e:
+            rc = e.code if isinstance(e.code, int) else EXIT_ENV
+        worst = max(worst, rc)
+
+    worst = EXIT_OK
+    run("lint", lambda: cmd_lint(args))
+    if not getattr(args, "skip_erc", False):
+        run("erc", lambda: cmd_erc(args))
+    else:
+        print("== erc: skipped (--skip-erc) ==")
+    if args.intent:
+        run("check-intent", lambda: cmd_check_intent(args))
+    if args.rules:
+        run("check-rules", lambda: cmd_check_rules(args))
+    verdict = {EXIT_OK: "PASS", EXIT_VIOLATIONS: "FINDINGS", EXIT_ENV: "ENV-ERROR"}.get(
+        worst, str(worst))
+    print(f"\n== check: {verdict} ==")
+    return worst
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="fiducial", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -637,6 +791,19 @@ def main(argv=None):
     p.add_argument("--json", action="store_true",
                    help="machine-readable JSON output")
     p.set_defaults(func=cmd_lint)
+
+    p = sub.add_parser("check", help="run the full verification gate (lint + erc + intent + rules)")
+    p.add_argument("project")
+    p.add_argument("--intent", help="intent.csv to audit against")
+    p.add_argument("--rules", help="rules CSV (see docs/rules.md)")
+    p.add_argument("--refresh", action="store_true", help="force netlist re-export")
+    p.add_argument("--skip-erc", action="store_true",
+                   help="skip ERC (environments without kicad-cli)")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable JSON output for the sub-checks")
+    p.set_defaults(func=cmd_check)
+    # cmd_check_intent reads args.orphans; the gate leaves it off
+    p.set_defaults(orphans=False)
 
     p = sub.add_parser("check-rules", help="verify house-style rules from a CSV")
     p.add_argument("project")
