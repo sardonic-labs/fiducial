@@ -1,0 +1,4 @@
+name,git_url,pin,subdir
+kicad-demos,https://github.com/KiCad/kicad-source-mirror.git,f4cccefa0829,demos
+zswatch-watch,https://github.com/ZSWatch/Watch-HW.git,891a3d524923,
+cynthion,https://github.com/greatscottgadgets/cynthion-hardware.git,13aa71c2fb0b,

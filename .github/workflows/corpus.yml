@@ -1,0 +1,28 @@
+name: corpus
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily, after the main CI window
+  workflow_dispatch:
+
+jobs:
+  foreign-corpus:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install KiCad 10
+        run: |
+          sudo add-apt-repository --yes ppa:kicad/kicad-10.0-releases
+          sudo apt-get update
+          sudo apt-get install -y --install-recommends kicad
+
+      - name: Run foreign-corpus harness
+        run: python3 scripts/corpus_harness.py
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: corpus-report
+          path: corpus/CORPUS_REPORT.md
