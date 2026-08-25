@@ -174,6 +174,53 @@ class TestParseSexp(unittest.TestCase):
         with self.assertRaises(ValueError):
             fid.parse_sexp(")")
 
+    def test_line_comment_stripped(self):
+        root = fid.parse_sexp('(a b ; comment\n c)')
+        self.assertEqual(root, ["a", "b", "c"])
+
+    def test_block_comment_stripped(self):
+        root = fid.parse_sexp('(a #|nested|# b)')
+        self.assertEqual(root, ["a", "b"])
+
+    def test_comment_inside_string_preserved(self):
+        root = fid.parse_sexp('(a "has ; comment")')
+        self.assertEqual(root[1], "has ; comment")
+
+    def test_newline_escape_in_string(self):
+        root = fid.parse_sexp(r'(a "line1\nline2")')
+        self.assertEqual(root[1], "line1\nline2")
+
+    def test_tab_escape_in_string(self):
+        root = fid.parse_sexp(r'(a "col1\tcol2")')
+        self.assertEqual(root[1], "col1\tcol2")
+
+    def test_backslash_escape_in_string(self):
+        root = fid.parse_sexp(r'(a "path\\to\\file")')
+        self.assertEqual(root[1], "path\\to\\file")
+
+
+class TestSexpJson(unittest.TestCase):
+    def test_sexp_subcommand_outputs_json(self):
+        import io, contextlib
+        out, err = io.StringIO(), io.StringIO()
+        fixture = Path(__file__).parent / "fixtures" / "healthy.kicad_sch"
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = fid.main(["sexp", str(fixture)])
+        self.assertEqual(rc, 0)
+        data = json.loads(out.getvalue())
+        self.assertIsInstance(data, dict)
+        self.assertEqual(data["_key"], "kicad_sch")
+
+    def test_sexp_raw_mode(self):
+        import io, contextlib
+        out, err = io.StringIO(), io.StringIO()
+        fixture = Path(__file__).parent / "fixtures" / "healthy.kicad_sch"
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = fid.main(["sexp", str(fixture), "--raw"])
+        self.assertEqual(rc, 0)
+        data = json.loads(out.getvalue())
+        self.assertIsInstance(data, list)
+
 
 class TestLint(OfflineTest):
     def test_healthy_board_is_clean(self):

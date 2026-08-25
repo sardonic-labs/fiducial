@@ -19,7 +19,54 @@ EXIT_ENV = 2
 
 # ---------------------------------------------------------------- s-expressions
 
+_ESCAPE = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\"}
+
+
+def _strip_comments(text):
+    """Remove ``;`` line comments and ``#|…|#`` block comments from KiCad
+    S-expression text *before* tokenising.  Handles nested block comments
+    and comments inside quoted strings (which should be preserved)."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':
+            # copy the whole quoted string verbatim (comments inside are literal)
+            j = i + 1
+            while j < n:
+                if text[j] == "\\" and j + 1 < n:
+                    j += 2
+                elif text[j] == '"':
+                    j += 1
+                    break
+                else:
+                    j += 1
+            out.append(text[i:j])
+            i = j
+        elif c == ";":
+            # line comment — skip to end of line
+            while i < n and text[i] != "\n":
+                i += 1
+        elif c == "#" and i + 1 < n and text[i + 1] == "|":
+            # block comment — skip to matching |#
+            depth = 1
+            i += 2
+            while i < n and depth > 0:
+                if text[i] == "#" and i + 1 < n and text[i + 1] == "|":
+                    depth += 1
+                    i += 2
+                elif text[i] == "|" and i + 1 < n and text[i + 1] == "#":
+                    depth -= 1
+                    i += 2
+                else:
+                    i += 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
 def parse_sexp(text):
+    text = _strip_comments(text)
     tokens = []
     i, n = 0, len(text)
     while i < n:
@@ -37,7 +84,7 @@ def parse_sexp(text):
             buf = []
             while j < n:
                 if text[j] == "\\" and j + 1 < n:
-                    buf.append(text[j + 1])
+                    buf.append(_ESCAPE.get(text[j + 1], text[j + 1]))
                     j += 2
                 elif text[j] == '"':
                     break
@@ -787,6 +834,59 @@ def cmd_check(args):
     return worst
 
 
+# ---------------------------------------------------------------- sexp → JSON
+
+def _sexp_to_json(node):
+    """Convert a parsed S-expression tree to a JSON-serialisable structure."""
+    if isinstance(node, list):
+        # (key args…) → {"_key": key, …children}
+        if node and isinstance(node[0], str):
+            out = {"_key": node[0]}
+            for item in node[1:]:
+                if isinstance(item, list):
+                    child = _sexp_to_json(item)
+                    k = child.pop("_key", "_list")
+                    # multi-valued keys become lists
+                    if k in out:
+                        if not isinstance(out[k], list):
+                            out[k] = [out[k]]
+                        out[k].append(child)
+                    else:
+                        out[k] = child
+                else:
+                    # bare atom after the key → _val (or _val if first)
+                    if "_val" not in out:
+                        out["_val"] = item
+                    elif "_rest" not in out:
+                        out["_rest"] = item
+                    else:
+                        # accumulate trailing atoms
+                        if not isinstance(out["_rest"], list):
+                            out["_rest"] = [out["_rest"]]
+                        out["_rest"].append(item)
+            return out
+        return [_sexp_to_json(x) for x in node]
+    return node
+
+
+def cmd_sexp(args):
+    """Parse an S-expression file and emit JSON to stdout."""
+    path = Path(args.file)
+    if not path.exists():
+        print(f"ERROR: {path} not found", file=sys.stderr)
+        return EXIT_ENV
+    try:
+        tree = load_sexp(path)
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        return EXIT_ENV
+    if args.raw:
+        print(json.dumps(tree, indent=2))
+    else:
+        print(json.dumps(_sexp_to_json(tree), indent=2))
+    return EXIT_OK
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="fiducial", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -868,6 +968,12 @@ def main(argv=None):
     p = sub.add_parser("bom", help="export BOM CSV")
     p.add_argument("project")
     p.set_defaults(func=cmd_bom)
+
+    p = sub.add_parser("sexp", help="parse S-expression file → JSON (for agents)")
+    p.add_argument("file", help=".kicad_sch, .kicad_pcb, .sexpr, or any S-expr file")
+    p.add_argument("--raw", action="store_true",
+                   help="emit raw nested lists instead of keyed objects")
+    p.set_defaults(func=cmd_sexp)
 
     args = ap.parse_args(argv)
 
