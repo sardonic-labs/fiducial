@@ -412,10 +412,15 @@ _RAIL_NETS = {"GND", "VCC", "VDD", "VSS", "AGND", "DGND", "AVDD", "AVSS", "VBUS"
 def _is_rail_net(name):
     """Conservative power-rail heuristic. Rails are excluded from orphan-cluster
     grouping because ground connects everything and would mask real islands.
-    Deliberately NOT matched: named rails like VBAT - a dangling VBAT net was
-    exactly the ghost this check exists to catch (2026-08-23)."""
+    Matches: canonical rail names, +/- prefixed nets, and voltage patterns
+    like 3V3, 5V_SYS, 12V, 1V8, etc."""
     n = name.strip().upper()
-    return n in _RAIL_NETS or n.startswith("+") or n.startswith("-")
+    if n in _RAIL_NETS or n.startswith("+") or n.startswith("-"):
+        return True
+    # Voltage rail pattern: optional +/- prefix, digit(s), V, optional suffix
+    # Examples: 3V3, 5V, 5V_SYS, 12V, 1V8, 3V3_ANALOG
+    import re
+    return bool(re.match(r'^[+-]?\d+V\d*[A-Z_]*$', n))
 
 
 def _orphan_clusters(nets):

@@ -124,11 +124,18 @@ def cmd_ratings(args):
         if ref and value:
             components.append({"ref": ref, "value": value, "footprint": footprint})
 
+    # Virtual/power symbols that are not real components
+    _VIRTUAL_PREFIXES = ("#", "PWR_FLAG", "FLG")
+
     # Heuristic checks
     for comp in components:
         ref = comp["ref"]
         value = comp["value"].strip()
         fp = comp["footprint"]
+
+        # Skip virtual symbols (PWR_FLAG, power flags, etc.)
+        if ref.startswith("#") or value.upper() == "PWR_FLAG":
+            continue
 
         # Check for very small resistor values (possible short)
         if ref.upper().startswith("R"):

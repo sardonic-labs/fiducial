@@ -98,6 +98,9 @@ def cmd_power_pins(args):
         ref = _get_ref(sym)
         if not ref:
             continue
+        # Skip virtual symbols
+        if ref.startswith("#") or _get_value(sym).upper() == "PWR_FLAG":
+            continue
         lib_node = sexp_get(sym, "lib_id")
         lib_id = _first_str(lib_node) if lib_node else ""
         for pin_node in sexp_find_all(sym, "pin"):
@@ -120,19 +123,33 @@ def cmd_power_pins(args):
                     "pin_number": pin_number,
                 })
 
+    # Also count power global labels (hierarchical power distribution)
+    power_global_labels = []
+    for lab in sexp_find_all(root, "global_label"):
+        val = _first_str(lab)
+        if val and _is_power_label(val):
+            power_global_labels.append(val)
+
     if args.json:
         print(json.dumps({"command": "power-pins", "target": str(args.project),
-                          "count": len(results), "pins": results}, indent=2))
+                          "count": len(results), "pins": results,
+                          "power_global_labels": sorted(set(power_global_labels))}, indent=2))
         return EXIT_OK
 
-    if not results:
+    if not results and not power_global_labels:
         print("No power pins found in schematic symbols.")
         return EXIT_OK
 
-    print(f"{'REF':<8}{'PIN NAME':<16}{'PIN#':<8}{'LIB_ID'}")
-    for r in results:
-        print(f"{r['ref']:<8}{r['pin_name']:<16}{r['pin_number']:<8}{r['lib_id']}")
-    print(f"\n{len(results)} power pin(s) found")
+    if results:
+        print(f"{'REF':<8}{'PIN NAME':<16}{'PIN#':<8}{'LIB_ID'}")
+        for r in results:
+            print(f"{r['ref']:<8}{r['pin_name']:<16}{r['pin_number']:<8}{r['lib_id']}")
+        print(f"\n{len(results)} power pin(s) found")
+
+    if power_global_labels:
+        unique_labels = sorted(set(power_global_labels))
+        print(f"\n{len(unique_labels)} power global label(s): {', '.join(unique_labels)}")
+
     return EXIT_OK
 
 
@@ -154,6 +171,9 @@ def cmd_unconnected(args):
     for sym in symbols:
         ref = _get_ref(sym)
         if not ref:
+            continue
+        # Skip virtual symbols (PWR_FLAG, power ports, etc.)
+        if ref.startswith("#") or _get_value(sym).upper() == "PWR_FLAG":
             continue
         for pin_node in sexp_find_all(sym, "pin"):
             pin_number = ""
@@ -232,6 +252,9 @@ def cmd_refdes_audit(args):
         ref = _get_ref(sym)
         if not ref:
             issues.append({"type": "missing_ref", "detail": "symbol without Reference property"})
+            continue
+        # Skip virtual symbols (PWR_FLAG uses #FLGxxx refdes by convention)
+        if ref.startswith("#") or _get_value(sym).upper() == "PWR_FLAG":
             continue
         prefix = "".join(c for c in ref if c.isalpha())
         if not prefix:

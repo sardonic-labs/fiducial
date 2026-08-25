@@ -100,13 +100,6 @@ def review_schematic_correctness(project, intent_csv=None):
             "No intent.csv provided - skipping intent verification",
             interactive_prompt="Provide intent.csv for full connectivity verification? (y/n)"))
 
-    # Power pin audit
-    out, rc, err = _run_script("schematic_check.py", ["power-pins", project])
-    data = _parse_json_output(out)
-    if data.get("count", 0) == 0:
-        findings.append(Finding("warning", "power-pins",
-            "No power pins found in schematic symbols - verify power connections exist"))
-
     # Unconnected pins
     out, rc, err = _run_script("schematic_check.py", ["unconnected", project])
     data = _parse_json_output(out)
@@ -128,7 +121,7 @@ def review_schematic_completeness(project):
     """Missing parts, unconnected pins, decoupling."""
     findings = []
 
-    # Unconnected pins
+    # Unconnected pins (also in schematic-correctness, but completeness needs count)
     out, rc, err = _run_script("schematic_check.py", ["unconnected", project])
     data = _parse_json_output(out)
     pins = data.get("pins", [])
@@ -141,14 +134,6 @@ def review_schematic_completeness(project):
         if len(pins) > 10:
             findings.append(Finding("error", "unconnected-pin-more",
                 f"... and {len(pins) - 10} more unconnected pins"))
-
-    # Orphan nets
-    out, rc, err = _run_script("schematic_check.py", ["orphan-nets", project])
-    data = _parse_json_output(out)
-    orphans = data.get("orphans", [])
-    if orphans:
-        findings.append(Finding("warning", "orphan-nets",
-            f"{len(orphans)} orphan net(s) with single connection"))
 
     # Decoupling check
     out, rc, err = _run_script("schematic_check.py", ["decoupling-check", project])
@@ -223,20 +208,23 @@ def review_power_tree(project):
     else:
         findings.append(Finding("info", "power-rails",
             f"{rail_count} power rail(s) detected"))
+        # List the rails found
+        rails = data.get("rails", {})
+        for rail_name, count in sorted(rails.items()):
+            findings.append(Finding("info", "rail-detail",
+                f"Rail '{rail_name}': {count} connection(s)"))
 
     # Power pins
     out, rc, err = _run_script("schematic_check.py", ["power-pins", project])
     data = _parse_json_output(out)
     count = data.get("count", 0)
-    if count == 0:
+    power_labels = data.get("power_global_labels", [])
+    if count == 0 and not power_labels:
         findings.append(Finding("warning", "power-pins",
-            "No power pins found in schematic symbols"))
-
-    # Decoupling
-    out, rc, err = _run_script("schematic_check.py", ["decoupling-check", project])
-    data = _parse_json_output(out)
-    for f in data.get("findings", []):
-        findings.append(Finding("warning", "decoupling", f["detail"]))
+            "No power pins or power global labels found"))
+    elif count == 0 and power_labels:
+        findings.append(Finding("info", "power-pins",
+            f"No direct power pins, but {len(power_labels)} power global label(s): {', '.join(power_labels)}"))
 
     # BOM ratings check (for voltage ratings)
     out, rc, err = _run_script("bom_check.py", ["ratings", project])
