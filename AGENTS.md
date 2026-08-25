@@ -57,6 +57,58 @@ Read these when doing the corresponding task — not all up front:
 - `skills/reference/best-practices.md` — power, signal integrity, ESD, DFM, testability checklists
 - `skills/reference/terminology.md` — canonical vocabulary; use these terms consistently
 
+## Review skills (standalone)
+
+Load when reviewing a design produced by another agent. Each skill guides a
+structured review with interactive prompts and severity-rated findings (error/warning/info).
+Use the reviewer orchestrator or run individual check scripts directly.
+
+### Orchestrator
+
+```
+python fiducial/scripts/reviewer.py <skill> <project_file> [--json] [--intent intent.csv]
+```
+
+| Skill | What it reviews |
+|---|---|
+| `schematic-correctness` | Intent matching, connectivity, pin assignments |
+| `schematic-completeness` | Missing parts, unconnected pins, decoupling |
+| `schematic-style` | House style, naming, labeling |
+| `power-tree` | Voltage margins, current paths, protection |
+| `pcb-layout` | Placement, board outline, clearances |
+| `pcb-routing` | Trace widths, via sizing, signal integrity |
+| `dfm` | Manufacturing constraints, copper balance |
+| `bom` | Part availability, ratings, alternatives |
+| `connectivity` | Cross-block connectivity, connector pinouts |
+| `documentation` | Title block, annotations, revision history |
+
+### Individual check scripts
+
+```
+python fiducial/scripts/schematic_check.py <command> <project.kicad_sch> [--json]
+python fiducial/scripts/pcb_check.py <command> <project.kicad_pcb> [--json]
+python fiducial/scripts/bom_check.py <command> <project.kicad_sch> [--json]
+```
+
+| Script | Commands |
+|---|---|
+| `schematic_check.py` | `power-pins`, `unconnected`, `orphan-nets`, `refdes-audit`, `label-audit`, `grid-check`, `debris-scan`, `symbol-lookup`, `decoupling-check`, `rail-audit` |
+| `pcb_check.py` | `board-stats`, `trace-widths`, `via-audit`, `copper-pours`, `drill-table`, `placement-density`, `board-outline` |
+| `bom_check.py` | `parse`, `ratings`, `lifecycle`, `alternates` |
+
+### Skill files
+
+- `skills/review/schematic-correctness.md` — intent matching, connectivity
+- `skills/review/schematic-completeness.md` — missing parts, unconnected pins
+- `skills/review/schematic-style.md` — house style, naming, labeling
+- `skills/review/power-tree.md` — voltage margins, current paths, protection
+- `skills/review/pcb-layout.md` — placement, board outline, clearances
+- `skills/review/pcb-routing.md` — trace widths, via sizing, signal integrity
+- `skills/review/dfm.md` — manufacturing constraints, copper balance
+- `skills/review/bom.md` — part availability, ratings, alternatives
+- `skills/review/connectivity.md` — cross-block connectivity, connector pinouts
+- `skills/review/documentation.md` — title block, annotations, revision history
+
 ## Workflow
 
 For any board project:
