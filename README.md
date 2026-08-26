@@ -174,9 +174,3 @@ reference point that keeps AI-generated hardware aligned with reality.
 v0 — battle-tested on one real board (RP2040 devboard), schematic side only.
 PCB-side tooling (`drc`, `render`) works but is not yet regression-covered.
 APIs may change while the ink is wet.
-
-## Use reports
-
-Agent use reports live in
-[`fiducial-devboard-example/docs/`](https://github.com/sardonic-labs/fiducial-devboard-example/tree/main/docs).
-These document real gaps found when agents use fiducial end-to-end.
