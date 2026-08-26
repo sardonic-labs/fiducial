@@ -55,6 +55,8 @@ python scripts/fiducial.py doctor                    # environment check
 python scripts/fiducial.py lint myboard.kicad_sch    # structural checks
 python scripts/fiducial.py erc myboard.kicad_sch     # KiCad ERC
 python scripts/fiducial.py check-intent myboard.kicad_sch intent.csv
+python scripts/fiducial.py overlap-check myboard.kicad_sch  # silent short detection
+python scripts/fiducial.py sexp myboard.kicad_sch    # S-expr → JSON for agents
 ```
 
 ## Commands
@@ -69,9 +71,14 @@ python scripts/fiducial.py check-intent myboard.kicad_sch intent.csv
 | `pins <project.kicad_sch> <REF>` | Dump one symbol's pins and their nets (numeric order) |
 | `check-intent <project.kicad_sch> intent.csv` | Compare expected connections (`ref,pin,expected_net`) against reality; `--orphans` also flags single-pin nets |
 | `lint <project.kicad_sch>` | Structural checks: duplicate refs, missing fields, unconnected pins, single-use labels, dangling nets |
-| `check-rules <project.kicad_sch> rules.csv` | Verify house-style rules from CSV (`min-contacts`, `net-exclusive`) — see [docs/rules.md](docs/rules.md) |
+| `check-rules <project.kicad_sch> rules.csv` | Verify house-style rules from CSV (`min-contacts`, `net-exclusive`, `allow-single-use`) — see [docs/rules.md](docs/rules.md) |
+| `overlap-check <project.kicad_sch>` | Detect wires from different nets sharing coordinates (silent shorts) |
 | `render <project...> --outdir DIR` | Export SVG renders of schematic and/or PCB so you can look at them |
 | `bom <project.kicad_sch>` | Export CSV bill of materials |
+| `sexp <file>` | Parse any S-expression file (`.kicad_sch`, `.kicad_pcb`, `.sexpr`) → JSON for agents; `--raw` for nested-list mode |
+| `wire-trace <sch> <ref> <pin>` | Trace what net a pin connects to through wires and labels |
+| `label-map <sch>` | Dump all labels with (x,y) coordinates, grouped by net |
+| `pin-positions <sch> <ref>` | Show absolute pin endpoints in schematic space |
 
 Exit codes: `0` clean, `1` violations found, `2` tool/environment error.
 These hold for every command, including in `--json` mode.
@@ -89,6 +96,12 @@ Netlist-based commands (`nets`, `pins`, `check-intent`, `lint`,
 the schematic; editing the `.kicad_sch` triggers automatic re-export.
 `--refresh` forces regeneration regardless.
 
+### Diagnostic commands
+
+`wire-trace`, `label-map`, and `pin-positions` parse the schematic directly
+(no kicad-cli) and answer common debugging questions: what net is this pin
+actually on, where are all the labels, do pin endpoints match the wiring.
+
 ## What you get
 
 - **Instruction library** in `skills/` — schematic authoring rules, PCB layout,
@@ -99,10 +112,15 @@ the schematic; editing the `.kicad_sch` triggers automatic re-export.
 
 | Tool | Catches |
 |---|---|
-| `lint` | duplicate refs, single-use labels, orphan nets, missing lib entries |
-| `check-intent` | any pin wired to the wrong net, missing connections |
+| `lint` | duplicate refs, single-use labels (with `allow-single-use` suppression), orphan nets, missing lib entries |
+| `check-intent` | any pin wired to the wrong net, missing connections, NC pin handling |
 | `check-rules` | house-style violations declared as CSV data |
+| `overlap-check` | wires from different nets sharing coordinates (silent shorts) |
 | `erc` / `drc` | KiCad rule violations, parsed and summarized |
+| `wire-trace` | what net a pin connects to through wires and labels |
+| `label-map` | all labels with coordinates, grouped by net |
+| `pin-positions` | absolute pin endpoints in schematic space |
+| `sexp` | S-expression → JSON conversion for any KiCad file |
 | `render` | SVG exports so the agent can visually inspect its own work |
 
 See [`examples/intent.csv`](examples/intent.csv) and
@@ -147,16 +165,18 @@ reference point that keeps AI-generated hardware aligned with reality.
 
 ## Roadmap
 
-- **Footprint/symbol resolution** — `scripts/find_part.py` + the
-  [footprints skill](skills/reference/footprints.md) search local and system
-  libraries by name; deeper LCSC/JLC catalog integration later
-- **Rules profiles** — reusable house-style standards (e.g., a satellite pin
-  standard) as loadable rule sets beyond per-board `rules.csv`
-- **Next domains: mechanical CAD (Fusion/FreeCAD/Onshape)** — same
-  architecture: spec-as-code rules plus a verification harness
+- **Schematic builder API** — `SchematicBuilder` class for programmatic schematic generation (addresses the biggest gap from agent use reports)
+- **Rules profiles** — reusable house-style standards (e.g., a satellite pin standard) as loadable rule sets beyond per-board `rules.csv`
+- **Next domains: mechanical CAD (Fusion/FreeCAD/Onshape)** — same architecture: spec-as-code rules plus a verification harness
 
 ## Status
 
 v0 — battle-tested on one real board (RP2040 devboard), schematic side only.
 PCB-side tooling (`drc`, `render`) works but is not yet regression-covered.
 APIs may change while the ink is wet.
+
+## Use reports
+
+Agent use reports live in
+[`fiducial-devboard-example/docs/`](https://github.com/sardonic-labs/fiducial-devboard-example/tree/main/docs).
+These document real gaps found when agents use fiducial end-to-end.
