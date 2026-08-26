@@ -1,0 +1,86 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(uuid f0000000-0000-0000-0000-000000000002)
+	(paper "A4")
+	(lib_symbols
+		(symbol "Test:Resistor"
+			(property "Reference" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(pin passive line
+				(at 0 -3.81 90)
+				(length 2.54)
+				(name "1"
+					(effects (font (size 1.27 1.27)))
+				)
+				(number "1"
+					(effects (font (size 1.27 1.27)))
+				)
+			)
+			(pin passive line
+				(at 0 3.81 270)
+				(length 2.54)
+				(name "2"
+					(effects (font (size 1.27 1.27)))
+				)
+				(number "2"
+					(effects (font (size 1.27 1.27)))
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Test:Resistor")
+		(at 50.8 50.8 0)
+		(uuid f0000000-0000-0000-0000-000000000020)
+		(property "Reference" "R1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "10k"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "R1") (unit 1))
+			)
+		)
+	)
+	(wire
+		(pts (xy 50.8 46.99) (xy 50.8 38.1))
+		(stroke (width 0) (type default))
+		(uuid "a1111111-1111-1111-1111-111111111111")
+	)
+	(wire
+		(pts (xy 50.8 38.1) (xy 63.5 38.1))
+		(stroke (width 0) (type default))
+		(uuid "a2222222-2222-2222-2222-222222222222")
+	)
+	(wire
+		(pts (xy 50.8 54.61) (xy 50.8 63.5))
+		(stroke (width 0) (type default))
+		(uuid "a3333333-3333-3333-3333-333333333333")
+	)
+	(wire
+		(pts (xy 50.8 63.5) (xy 63.5 63.5))
+		(stroke (width 0) (type default))
+		(uuid "a4444444-4444-4444-4444-444444444444")
+	)
+	(label "NET_A"
+		(at 63.5 38.1 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "b1111111-1111-1111-1111-111111111111")
+	)
+	(label "NET_B"
+		(at 63.5 63.5 0)
+		(effects (font (size 1.27 1.27)) (justify left bottom))
+		(uuid "b2222222-2222-2222-2222-222222222222")
+	)
+)

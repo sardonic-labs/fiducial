@@ -264,6 +264,53 @@ class TestLint(OfflineTest):
         self.assertEqual(rc, fid.EXIT_ENV)
 
 
+class TestLintAllowSingleUse(OfflineTest):
+    def test_single_use_label_warns_without_rules(self):
+        proj = self.project("single-use-label.kicad_sch")
+        self.cache_netlist(proj)
+        rc, out, _ = self.run_main("lint", str(proj))
+        self.assertEqual(rc, fid.EXIT_VIOLATIONS)
+        self.assertIn("'TYPO' appears only once", out)
+
+    def test_single_use_label_suppressed_with_rules(self):
+        proj = self.project("single-use-label.kicad_sch")
+        self.cache_netlist(proj)
+        rules = self.write("rules-allow.csv",
+                           "rule,net,params\nallow-single-use,TYPO,\n")
+        rc, out, _ = self.run_main("lint", str(proj), "--rules", str(rules))
+        self.assertNotIn("appears only once", out)
+
+    def test_non_allowed_label_still_warns(self):
+        """Two single-use labels; allowing one must still warn about the other."""
+        text = (FIXTURES / "single-use-label.kicad_sch").read_text()
+        text = text.rstrip().rstrip(")") + '\t(label "STILLWARN" (at 40 40 0))\n)'
+        proj = self.tmp / "two-labels.kicad_sch"
+        proj.write_text(text, encoding="utf-8")
+        self.cache_netlist(proj)
+        rules = self.write("rules-allow.csv",
+                           "rule,net,params\nallow-single-use,TYPO,\n")
+        rc, out, _ = self.run_main("lint", str(proj), "--rules", str(rules))
+        single_use_lines = [l for l in out.splitlines()
+                            if "appears only once" in l]
+        self.assertEqual(len(single_use_lines), 1)
+        self.assertIn("STILLWARN", single_use_lines[0])
+        self.assertNotIn("TYPO", single_use_lines[0])
+
+    def test_empty_rules_file_no_crash(self):
+        proj = self.project("single-use-label.kicad_sch")
+        self.cache_netlist(proj)
+        rules = self.write("rules-empty.csv", "rule,net,params\n")
+        rc, out, _ = self.run_main("lint", str(proj), "--rules", str(rules))
+        self.assertIn("'TYPO' appears only once", out)
+
+    def test_empty_rules_file_no_crash(self):
+        proj = self.project("single-use-label.kicad_sch")
+        self.cache_netlist(proj)
+        rules = self.write("rules-empty.csv", "rule,net,params\n")
+        rc, out, _ = self.run_main("lint", str(proj), "--rules", str(rules))
+        self.assertIn("'TYPO' appears only once", out)
+
+
 class TestCheckIntent(OfflineTest):
     def test_all_ok(self):
         proj = self.project()
@@ -300,6 +347,16 @@ class TestCheckIntent(OfflineTest):
         csvp = self.write("bad.csv", "foo,bar\nx,y\n")
         rc, _, err = self.run_main("check-intent", str(proj), str(csvp))
         self.assertEqual(rc, fid.EXIT_ENV)
+
+    def test_nc_pin_not_missing(self):
+        proj = self.project()
+        self.cache_netlist(proj)
+        csvp = self.write("nc.csv",
+                          "ref,pin,expected_net\nR1,1,/A\nR1,99,NC\n")
+        rc, out, _ = self.run_main("check-intent", str(proj), str(csvp))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("2/2 connections verified", out)
+        self.assertNotIn("MISSING", out)
 
     def test_json_output(self):
         proj = self.project()
@@ -670,6 +727,50 @@ class TestLintGeometry(unittest.TestCase):
         self.assertIn("wire endpoint off-grid (31.0, 12.7)", out)
 
 
+class TestOverlapCheck(OfflineTest):
+    def test_overlap_detected(self):
+        proj = self.project("overlap-wires.kicad_sch")
+        rc, out, _ = self.run_main("overlap-check", str(proj))
+        self.assertEqual(rc, fid.EXIT_VIOLATIONS, out)
+        self.assertIn("OVERLAP", out)
+        self.assertIn("USB_DP", out)
+        self.assertIn("QSPI_SCLK", out)
+
+    def test_no_overlap_clean(self):
+        proj = self.project("no-overlap.kicad_sch")
+        rc, out, _ = self.run_main("overlap-check", str(proj))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("clean", out)
+
+    def test_same_net_no_overlap(self):
+        """Two wires from the same net meeting at a point is valid."""
+        proj = self.project("no-overlap.kicad_sch")
+        rc, out, _ = self.run_main("overlap-check", str(proj))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertNotIn("OVERLAP", out)
+
+    def test_json_output_overlap(self):
+        proj = self.project("overlap-wires.kicad_sch")
+        rc, out, _ = self.run_main("overlap-check", str(proj), "--json")
+        self.assertEqual(rc, fid.EXIT_VIOLATIONS)
+        doc = json.loads(out)
+        self.assertEqual(doc["command"], "overlap-check")
+        self.assertGreaterEqual(doc["overlap_count"], 1)
+        self.assertTrue(any("USB_DP" in o["nets"] for o in doc["overlaps"]))
+
+    def test_json_output_clean(self):
+        proj = self.project("no-overlap.kicad_sch")
+        rc, out, _ = self.run_main("overlap-check", str(proj), "--json")
+        self.assertEqual(rc, fid.EXIT_OK)
+        doc = json.loads(out)
+        self.assertEqual(doc["overlap_count"], 0)
+
+    def test_missing_file_exits_env(self):
+        rc, _, err = self.run_main("overlap-check",
+                                   str(self.tmp / "nope.kicad_sch"))
+        self.assertEqual(rc, fid.EXIT_ENV)
+
+
 class TestCheckGate(unittest.TestCase):
     def test_gate_passes_healthy_board_without_kicad(self):
         tmp = Path(tempfile.mkdtemp(prefix="fiducial-check-"))
@@ -700,6 +801,149 @@ class TestCheckGate(unittest.TestCase):
             rc = fid.main(["check", str(proj), "--skip-erc"])
         self.assertEqual(rc, fid.EXIT_VIOLATIONS)
         self.assertIn("== check: FINDINGS ==", out.getvalue())
+
+
+WIRED_NETLIST = """(export (version "E")
+\t(components
+\t\t(comp (ref "R1") (value "10k") (footprint "R_0603"))
+\t)
+\t(nets
+\t\t(net (code "1") (name "NET_A")
+\t\t\t(node (ref "R1") (pin "1")))
+\t\t(net (code "2") (name "NET_B")
+\t\t\t(node (ref "R1") (pin "2")))
+\t)
+)"""
+
+
+class TestLabelMap(OfflineTest):
+    def test_label_map_healthy_board(self):
+        proj = self.project()
+        rc, out, _ = self.run_main("label-map", str(proj))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("/A", out)
+        self.assertIn("/B", out)
+        self.assertIn("/VCC", out)
+        self.assertIn("/GND", out)
+
+    def test_label_map_shows_coordinates(self):
+        proj = self.project()
+        rc, out, _ = self.run_main("label-map", str(proj))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertRegex(out, r"\(12\.70, 12\.70\)")
+
+    def test_label_map_empty_schematic(self):
+        proj = self.tmp / "empty.kicad_sch"
+        proj.write_text('(kicad_sch (version 20250114) (generator "eeschema")'
+                        ' (uuid "00000000-0000-0000-0000-000000000003")'
+                        ' (paper "A4"))', encoding="utf-8")
+        rc, out, _ = self.run_main("label-map", str(proj))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertEqual(out.strip(), "")
+
+    def test_label_map_grouped_by_name(self):
+        proj = self.project()
+        rc, out, _ = self.run_main("label-map", str(proj))
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        lines = out.strip().splitlines()
+        # /A appears twice, then next group starts with /B
+        a_line_idx = next(i for i, l in enumerate(lines) if l.strip() == "/A")
+        # entries under /A are indented lines starting with (
+        entries = []
+        for l in lines[a_line_idx + 1:]:
+            if l.startswith("  ("):
+                entries.append(l)
+            elif l.strip() and not l.startswith("  ("):
+                break
+        self.assertEqual(len(entries), 2)
+
+
+class TestPinPositions(OfflineTest):
+    def test_pin_positions_wired_fixture(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, out, _ = self.run_main("pin-positions", str(proj), "R1")
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("Pin 1:", out)
+        self.assertIn("Pin 2:", out)
+
+    def test_pin_positions_shows_coordinates(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, out, _ = self.run_main("pin-positions", str(proj), "R1")
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertRegex(out, r"Pin 1: \(50\.80, 46\.99\)")
+        self.assertRegex(out, r"Pin 2: \(50\.80, 54\.61\)")
+
+    def test_pin_positions_shows_net(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, out, _ = self.run_main("pin-positions", str(proj), "R1")
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("-> NET_A", out)
+        self.assertIn("-> NET_B", out)
+
+    def test_pin_positions_unknown_ref(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, _, err = self.run_main("pin-positions", str(proj), "X99")
+        self.assertEqual(rc, fid.EXIT_ENV)
+        self.assertIn("X99", err)
+
+    def test_pin_positions_demo_board(self):
+        proj = self.project("rp2040-devboard.kicad_sch")
+        nl = fid._netlist_path(proj)
+        shutil.copy(FIXTURES / "demo-board-netlist.sexpr", nl)
+        st = proj.stat()
+        os.utime(nl, (st.st_mtime + 100,) * 2)
+        rc, out, _ = self.run_main("pin-positions", str(proj), "U1")
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("Pin 1:", out)
+
+
+class TestWireTrace(OfflineTest):
+    def test_wire_trace_to_label(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, out, _ = self.run_main("wire-trace", str(proj), "R1", "1")
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("R1.1", out)
+        self.assertIn("NET_A", out)
+
+    def test_wire_trace_pin2(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, out, _ = self.run_main("wire-trace", str(proj), "R1", "2")
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("R1.2", out)
+        self.assertIn("NET_B", out)
+
+    def test_wire_trace_unknown_ref(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, _, err = self.run_main("wire-trace", str(proj), "X99", "1")
+        self.assertEqual(rc, fid.EXIT_ENV)
+        self.assertIn("X99", err)
+
+    def test_wire_trace_unknown_pin(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        rc, _, err = self.run_main("wire-trace", str(proj), "R1", "99")
+        self.assertEqual(rc, fid.EXIT_ENV)
+        self.assertIn("99", err)
+
+    def test_wire_trace_no_wires_falls_back_to_netlist(self):
+        proj = self.project("wired.kicad_sch")
+        self.cache_netlist(proj, WIRED_NETLIST)
+        # Remove wires from schematic so wire graph is empty
+        text = proj.read_text(encoding="utf-8")
+        import re
+        text = re.sub(r'\t\(wire.*?\n\t\)\n', '', text, flags=re.DOTALL)
+        proj.write_text(text, encoding="utf-8")
+        rc, out, _ = self.run_main("wire-trace", str(proj), "R1", "1")
+        self.assertEqual(rc, fid.EXIT_OK, out)
+        self.assertIn("R1.1", out)
+        self.assertIn("NET_A", out)
 
 
 if __name__ == "__main__":
