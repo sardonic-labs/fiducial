@@ -1,0 +1,36 @@
+# This file enables GitHub's “Cite this repository” button and Zenodo archiving.
+# See https://citation-file-format.github.io/ and https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-citation-files
+cff-version: 1.2.0
+message: "If you use fiducial in your research, hardware, or agent workflow, please cite it."
+title: fiducial
+abstract: "AI agents hallucinate pinouts — fiducial catches them. Drop-in KiCad verification: intent CSV + lint/erc/check-intent with exit-code gates and a SchematicBuilder API."
+type: software
+authors:
+  - given-names: Oliver
+    family-names: Bigbee
+    email: oliverbigbee@gmail.com
+    orcid: https://orcid.org/0000-0000-0000-0000
+  - name: fiducial contributors
+    website: https://github.com/sardonic-labs/fiducial/graphs/contributors
+license: MIT
+repository-code: https://github.com/sardonic-labs/fiducial
+url: https://github.com/sardonic-labs/fiducial
+keywords:
+  - kicad
+  - hardware
+  - verification
+  - ai-agents
+  - schematic
+  - fiducial
+version: 0.1.0
+date-released: 2026-08-27
+preferred-citation:
+  type: software
+  authors:
+    - given-names: Oliver
+      family-names: Bigbee
+  title: fiducial
+  year: 2026
+  publisher:
+    name: sardonic labs
+  url: https://github.com/sardonic-labs/fiducial
