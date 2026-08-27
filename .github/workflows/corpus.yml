@@ -8,8 +8,19 @@ on:
 jobs:
   foreign-corpus:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache apt archives (KiCad 10)
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-kicad-10-corpus-${{ hashFiles('.github/workflows/corpus.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-apt-kicad-10-corpus-
+            ${{ runner.os }}-apt-kicad-10-
+            ${{ runner.os }}-apt-
 
       - name: Install KiCad 10
         run: |
