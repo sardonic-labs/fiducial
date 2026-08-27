@@ -1,0 +1,1 @@
+mimo works via opencode/mimo-v2.5-free at 2026-08-27
