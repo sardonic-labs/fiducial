@@ -13,13 +13,17 @@ import contextlib
 import io
 import json
 import os
+import sys
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
 import importlib.util
 from pathlib import Path
+
+# SchematicBuilder lives alongside fiducial.py
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+import schematic_builder as sb
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -944,6 +948,115 @@ class TestWireTrace(OfflineTest):
         self.assertEqual(rc, fid.EXIT_OK, out)
         self.assertIn("R1.1", out)
         self.assertIn("NET_A", out)
+
+
+class TestSchematicBuilder(unittest.TestCase):
+    """Tests for the schematic_builder.py module."""
+
+    def test_build_empty_schematic(self):
+        content = sb.build_schematic("Empty Board")
+        self.assertIn('(version 20260306)', content)
+        self.assertIn('(title "Empty Board")', content)
+        self.assertIn('(generator "fiducial_schematic_builder")', content)
+
+    def test_add_symbol(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_symbol("Device:R", "R1", x=101.6, y=76.2, value="10k")
+        content = sch.build()
+        self.assertIn('(lib_id "Device:R")', content)
+        self.assertIn('(reference "R1")', content)
+        self.assertIn('(at 101.6 76.2 0)', content)
+        self.assertIn('(property "Value" "10k"', content)
+
+    def test_add_wire(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_wire(101.6, 76.2, 114.3, 76.2)
+        content = sch.build()
+        self.assertIn('(wire', content)
+        self.assertIn('(xy 101.6 76.2)', content)
+        self.assertIn('(xy 114.3 76.2)', content)
+
+    def test_add_label(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_label("SIG_IN", 101.6, 76.2, rotation=180)
+        content = sch.build()
+        self.assertIn('(label "SIG_IN"', content)
+        self.assertIn('(at 101.6 76.2 180)', content)
+
+    def test_add_global_label(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_global_label("CLK", 50.0, 50.0)
+        content = sch.build()
+        self.assertIn('(global_label "CLK"', content)
+
+    def test_add_power(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_power("power:GND", 101.6, 88.9)
+        content = sch.build()
+        self.assertIn('(lib_id "power:GND")', content)
+        self.assertIn('#PWR001', content)
+        self.assertIn('(property "Value" "GND"', content)
+
+    def test_add_no_connect(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_no_connect(127.0, 99.06)
+        content = sch.build()
+        self.assertIn('(no_connect', content)
+        self.assertIn('127', content)
+        self.assertIn('99.06', content)
+
+    def test_power_counter_increments(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_power("power:GND", 100, 100)
+        sch.add_power("power:GND", 110, 100)
+        sch.add_power("power:+3V3", 100, 90)
+        content = sch.build()
+        self.assertIn('#PWR001', content)
+        self.assertIn('#PWR002', content)
+        self.assertIn('#PWR003', content)
+
+    def test_all_uuids_unique(self):
+        sch = sb.SchematicBuilder("Test")
+        sch.add_symbol("Device:R", "R1", 100, 100)
+        sch.add_wire(100, 100, 120, 100)
+        sch.add_label("A", 100, 100)
+        sch.add_no_connect(130, 100)
+        content = sch.build()
+        import re
+        uuids = re.findall(r'\(uuid "([^"]+)"\)', content)
+        self.assertEqual(len(uuids), len(set(uuids)), "duplicate UUIDs found")
+
+    def test_build_round_trip_parseable(self):
+        sch = sb.SchematicBuilder("Parseable")
+        sch.add_symbol("Device:R", "R1", 101.6, 76.2)
+        sch.add_wire(101.6, 76.2, 114.3, 76.2)
+        sch.add_label("NET_A", 101.6, 76.2)
+        sch.add_power("power:GND", 101.6, 88.9)
+        sch.add_no_connect(127.0, 99.06)
+        content = sch.build()
+        # Should parse without errors
+        tree = fid.parse_sexp(content)
+        self.assertEqual(tree[0], "kicad_sch")
+
+    def test_convenience_function(self):
+        content = sb.build_schematic(
+            "Quick Board",
+            symbols=[("Device:R", "R1", 100, 100)],
+            wires=[(100, 100, 120, 100)],
+            labels=[("SIG", 100, 100)],
+            power=[("power:GND", 100, 112)],
+            no_connects=[(130, 100)],
+        )
+        self.assertIn('(title "Quick Board")', content)
+        self.assertIn('(lib_id "Device:R")', content)
+        self.assertIn('(label "SIG"', content)
+
+    def test_format_float_strips_trailing_zeros(self):
+        self.assertEqual(sb._fmt(101.6000), "101.6")
+        self.assertEqual(sb._fmt(100.0), "100")
+        self.assertEqual(sb._fmt(0.0), "0")
+        self.assertEqual(sb._fmt(180), "180")
+        self.assertEqual(sb._fmt(99.06), "99.06")
 
 
 if __name__ == "__main__":
