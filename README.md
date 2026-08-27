@@ -102,6 +102,18 @@ the schematic; editing the `.kicad_sch` triggers automatic re-export.
 (no kicad-cli) and answer common debugging questions: what net is this pin
 actually on, where are all the labels, do pin endpoints match the wiring.
 
+## Docs
+
+Human + agent docs are split but single-sourced (see `docs/index.md:1`):
+
+* **Tutorial (5 min):** `docs/tutorial.md:1` — one path for both.
+* **How-to:** `docs/howto/add-intent.md`, `docs/howto/migrate-handrolled.md`.
+* **Reference:** `docs/reference/cli.md` (all `fiducial.py:1252` commands), `docs/reference/api-builder.md` (`schematic_builder.py:144`), `docs/reference/sexp.md`, `docs/reference/exit-codes.md`, `docs/kicad-versions.md:1`, `docs/rules.md:1`.
+* **Explanation:** `docs/explanation/architecture.md` (why ERC ≠ intent), `docs/explanation/compatibility.md` (v0.1 contract).
+* **Agent map:** `skills/index.md` (per-task `skills/*.md`).
+
+Verify docs ↔ code: `python scripts/docs_check.py` (stdlib-only, CI-friendly).
+
 ## What you get
 
 - **Instruction library** in `skills/` — schematic authoring rules, PCB layout,
