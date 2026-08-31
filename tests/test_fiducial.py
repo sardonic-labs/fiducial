@@ -16,8 +16,10 @@ SCRIPT = ROOT / "scripts" / "fiducial.py"
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SCH = FIXTURES / "rp2040-devboard.kicad_sch"
 CSV = FIXTURES / "rp2040-intent.csv"
+PCB = FIXTURES / "healthy.kicad_pcb"
 GENERATED = [FIXTURES / "rp2040-devboard-netlist.sexpr",
-             FIXTURES / "rp2040-devboard-bom.csv"]
+             FIXTURES / "rp2040-devboard-bom.csv",
+             FIXTURES / "healthy.kicad_pcb-bom.csv"]
 
 
 def run_cli(*args):
@@ -85,6 +87,42 @@ class TestWithKiCad(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("W25Q16JVSS", proc.stdout)
         self.assertIn("/QSPI_SS", proc.stdout)
+
+    # --- PCB regression: same standard as schematic side (ROADMAP Week 2) ---
+
+    def test_drc_clean(self):
+        """Minimal healthy PCB passes DRC (0 errors) — proves kicad-cli wiring."""
+        proc = run_cli("drc", str(PCB))
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("0 errors", proc.stdout)
+
+    def test_drc_json(self):
+        proc = run_cli("drc", str(PCB), "--json")
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        import json
+        doc = json.loads(proc.stdout)
+        self.assertEqual(doc["tool"], "DRC")
+        self.assertEqual(doc["error_count"], 0)
+
+    def test_render_pcb(self):
+        outdir = FIXTURES / "render-pcb-test"
+        proc = run_cli("render", str(PCB), "--outdir", str(outdir))
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("rendered", proc.stdout)
+        # pcb export svg writes one file per invocation
+        svgs = list(outdir.glob("*.svg"))
+        self.assertTrue(len(svgs) >= 1, f"no SVG in {outdir}: {proc.stdout}")
+        # cleanup
+        import shutil
+        shutil.rmtree(outdir, ignore_errors=True)
+
+    def test_render_sch(self):
+        outdir = FIXTURES / "render-sch-test"
+        proc = run_cli("render", str(SCH), "--outdir", str(outdir))
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("rendered", proc.stdout)
+        import shutil
+        shutil.rmtree(outdir, ignore_errors=True)
 
 
 if __name__ == "__main__":
