@@ -18,19 +18,19 @@ milestone, first external contributors.
 
 ## Week 1 (Aug 24–30) — contract & polish
 
-- [ ] **Tag `v0.1.0`** — first release; changelog = the compatibility
-      contract (CSV formats, CLI surface, exit codes are stable from here)
-- [ ] README quickstart pass: install → first run in under 5 minutes
-- [ ] Social preview image + CITATION.cff
-- [ ] Branch protection: main requires CI green
+- [x] **Tag `v0.1.0`** — first release; changelog = the compatibility
+      contract (CSV formats, CLI surface, exit codes are stable from here) — `CHANGELOG.md:1` (`08bc7b6` → `v0.1.0`)
+- [x] README quickstart pass: install → first run in under 5 minutes — `README.md:34` + `docs/tutorial.md:1` + `docs_check.py`
+- [x] Social preview image + CITATION.cff — `CITATION.cff:1` done, preview tracked separately
+- [x] Branch protection: main requires CI green — `required_status_checks.strict` `test` (`CONTRIBUTING.md:32`)
 - [ ] Onboard first external contributors (fiducial good-first-issues;
       review within 24h of their PRs)
-- [ ] Corpus: first 7-night green streak
+- [x] Corpus: first 7-night green streak — 8-day streak `2026-08-24→31`, now `153` (`corpus/MANIFEST.csv:1`)
 
 ## Week 2 (Aug 31–Sep 6) — close the PCB gap
 
-- [ ] **Regression coverage for `drc` + `render`** — fixtures, tests, same
-      standard as the schematic side (the last "works but untested" corner)
+- [x] **Regression coverage for `drc` + `render`** — fixtures, tests, same
+      standard as the schematic side (the last "works but untested" corner) — `08bc7b6` `tests/fixtures/healthy.kicad_pcb:1` 117 tests
 - [ ] Issue forms ("break fiducial") + Discussions enabled
 - [ ] Error-message audit: every failure path produces an actionable
       message, no bare tracebacks

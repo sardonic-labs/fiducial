@@ -101,12 +101,12 @@ A fiducial is the reference mark assembly machines align to. This repo keeps AI-
 ## Roadmap
 
 - [x] **Schematic builder API** — `SchematicBuilder` (`scripts/schematic_builder.py:144`, `docs/builder.md:1`)
+- [x] **PCB regression coverage** — `drc` + `render` fixtures/tests (`tests/fixtures/healthy.kicad_pcb:1`, `ROADMAP.md:32` closed in `08bc7b6`)
 - [ ] **Rules profiles** — loadable house-style sets (`satellite` from Pin Standard v0.3) beyond per-board `rules.csv`
-- [ ] **PCB regression coverage** — `drc` + `render` fixtures/tests (last “works but untested” corner)
 - Next domains: mechanical CAD (Fusion/FreeCAD/Onshape) — same verification architecture
 
-See `ROADMAP.md:1` for the 30-day plan (v0.1 contract → v0.2 + Show HN gate).
+See `ROADMAP.md:1` for the 30-day plan (v0.1 contract → v0.2 + Show HN gate). Changelog is the contract: `CHANGELOG.md:1`.
 
 ## Status
 
-v0 — builder + schematic-side verification battle-tested on RP2040 devboard; PCB-side `drc`/`render` works but not yet regression-covered. APIs may change while the ink is wet.
+**v0.1.0** — contract frozen (`CHANGELOG.md:1`, `docs/explanation/compatibility.md:1`): CSV formats, CLI surface (`fiducial.py:1252` 17 commands), exit codes `0/1/2` (`fiducial.py:15`), and JSON shapes are stable. Builder + schematic + PCB verification (117 tests, 153-board corpus, nightly `corpus.yml:1`) — use `git tag v0.1.0`.
