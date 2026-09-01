@@ -9,8 +9,8 @@
   "labels": {
     "auto": "fusioneer:auto"
   },
-  "verify": "python -m unittest discover -s tests -v && python scripts/docs_check.py",
-  "hardware_verify": "python scripts/fiducial.py lint && python scripts/fiducial.py erc && python scripts/fiducial.py check-intent",
+  "verify": "python3 -m unittest discover -s tests -v && python3 scripts/docs_check.py",
+  "hardware_verify": "python3 scripts/fiducial.py lint && python3 scripts/fiducial.py erc && python3 scripts/fiducial.py check-intent",
   "revision": {
     "triggers": ["/fusioneer", "/revise"],
     "maxRevisions": 3
