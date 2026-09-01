@@ -1,0 +1,35 @@
+name: fusioneer
+on:
+  issues:
+    types: [labeled, opened]
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  trigger:
+    if: >-
+      github.event.label.name == 'fusioneer:auto' ||
+      contains(github.event.comment.body || '', '/fusioneer') ||
+      github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger fusioneer webhook
+        env:
+          FUSIONEER_DOMAIN: ${{ secrets.FUSIONEER_DOMAIN }}
+        run: |
+          if [ -z "$FUSIONEER_DOMAIN" ]; then echo "FUSIONEER_DOMAIN not set — skipping"; exit 0; fi
+          # jq is preinstalled on ubuntu-latest; build minimal forwarding payload
+          payload=$(jq -n \
+            --arg repo "${{ github.repository }}" \
+            --arg event "${{ github.event_name }}" \
+            --argjson gh '${{ toJson(github.event) }}' \
+            '{repo:$repo, event:$event, payload:$gh}')
+          curl -fsSL -X POST "$FUSIONEER_DOMAIN/webhook/github" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: ${{ github.event_name }}" \
+            -H "X-GitHub-Delivery: ${{ github.run_id }}-${{ github.run_attempt }}" \
+            -d "$payload" || echo "webhook failed (VPS unreachable)"

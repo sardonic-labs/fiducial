@@ -1,0 +1,4 @@
+[submodule ".opencode/fusioneer"]
+	path = .opencode/fusioneer
+	url = https://github.com/sardonic-labs/fusioneer.git
+	ignore = dirty
