@@ -1197,5 +1197,133 @@ class TestSchematicBuilder(unittest.TestCase):
         self.assertEqual(sb._fmt(99.06), "99.06")
 
 
+class TestPcbAutoroute(OfflineTest):
+    """Deterministic autorouter for non-spatial AI models (pcb_router.py:1)."""
+
+    def _make_two_resistor_board(self, tmp_path):
+        src = (FIXTURES / "healthy.kicad_pcb").read_text(encoding="utf-8")
+        second = '''
+	(footprint "Resistor_SMD:R_0603_1608Metric"
+		(layer "F.Cu")
+		(at 110 100)
+		(descr "Resistor SMD 0603")
+		(tags "resistor")
+		(property "Reference" "R2"
+			(at 0 -1.27 0)
+			(layer "F.SilkS")
+			(uuid "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+		)
+		(property "Value" "10k"
+			(at 0 1.27 0)
+			(layer "F.Fab")
+			(uuid "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		)
+		(property "Footprint" "Resistor_SMD:R_0603_1608Metric"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "cccccccc-cccc-cccc-cccc-cccccccccccc")
+		)
+		(attr smd)
+		(pad "1" smd rect
+			(at -0.8 0)
+			(size 0.9 0.95)
+			(layers "F.Cu" "F.Paste" "F.Mask")
+			(net 1 "GND")
+			(uuid "dddddddd-dddd-dddd-dddd-dddddddddddd")
+		)
+		(pad "2" smd rect
+			(at 0.8 0)
+			(size 0.9 0.95)
+			(layers "F.Cu" "F.Paste" "F.Mask")
+			(net 2 "VCC")
+			(uuid "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+		)
+		(uuid "ffffffff-ffff-ffff-ffff-ffffffffffff")
+	)
+'''
+        idx = src.rfind("(gr_line")
+        text = src[:idx] + second + "\n" + src[idx:]
+        p = tmp_path / "two.kicad_pcb"
+        p.write_text(text, encoding="utf-8")
+        return p
+
+    def test_healthy_board_zero_routed(self):
+        rc, out, _ = self.run_main("autoroute", str(FIXTURES / "healthy.kicad_pcb"), "--dry-run", "--json")
+        self.assertEqual(rc, fid.EXIT_OK)
+        doc = json.loads(out)
+        self.assertEqual(doc["routed_nets"], 0)
+        self.assertEqual(doc["segment_count"], 0)
+        self.assertEqual(doc["unrouted"], [])
+
+    def test_two_resistors_routed_astar(self):
+        board = self._make_two_resistor_board(self.tmp)
+        rc, out, _ = self.run_main("autoroute", str(board), "--dry-run", "--json")
+        self.assertEqual(rc, fid.EXIT_OK)
+        doc = json.loads(out)
+        self.assertEqual(doc["routed_nets"], 2)
+        self.assertEqual(doc["segment_count"], 2)
+        self.assertEqual(doc["strategy"], "astar")
+
+    def test_two_resistors_escape_strategy(self):
+        board = self._make_two_resistor_board(self.tmp)
+        rc, out, _ = self.run_main("autoroute", str(board), "--dry-run", "--json", "--strategy", "escape")
+        self.assertEqual(rc, fid.EXIT_OK)
+        doc = json.loads(out)
+        self.assertEqual(doc["routed_nets"], 2)
+        self.assertEqual(doc["segment_count"], 2)
+
+    def test_deterministic_repeat(self):
+        board = self._make_two_resistor_board(self.tmp)
+        _, out1, _ = self.run_main("autoroute", str(board), "--dry-run", "--json")
+        _, out2, _ = self.run_main("autoroute", str(board), "--dry-run", "--json")
+        self.assertEqual(json.loads(out1)["segment_count"], json.loads(out2)["segment_count"])
+        self.assertEqual(json.loads(out1)["routed_nets"], json.loads(out2)["routed_nets"])
+
+    def test_dry_run_does_not_write(self):
+        board = self._make_two_resistor_board(self.tmp)
+        before = board.read_text(encoding="utf-8")
+        self.run_main("autoroute", str(board), "--dry-run", "--json")
+        after = board.read_text(encoding="utf-8")
+        self.assertEqual(before, after)
+        self.assertNotIn("(segment", after)
+
+    def test_write_and_idempotent(self):
+        board = self._make_two_resistor_board(self.tmp)
+        out_board = self.tmp / "routed.kicad_pcb"
+        import shutil
+        shutil.copy(board, out_board)
+        rc, out, _ = self.run_main("autoroute", str(out_board), "--json")
+        self.assertEqual(rc, fid.EXIT_OK)
+        doc = json.loads(out)
+        self.assertEqual(doc["segment_count"], 2)
+        text = out_board.read_text(encoding="utf-8")
+        self.assertEqual(text.count("(segment"), 2)
+        # second run on already routed board -> 0 new
+        rc2, out2, _ = self.run_main("autoroute", str(out_board), "--dry-run", "--json")
+        self.assertEqual(rc2, fid.EXIT_OK)
+        self.assertEqual(json.loads(out2)["segment_count"], 0)
+
+    def test_json_shape(self):
+        board = self._make_two_resistor_board(self.tmp)
+        rc, out, _ = self.run_main("autoroute", str(board), "--dry-run", "--json")
+        doc = json.loads(out)
+        for key in ("command", "board", "routed_nets", "segment_count", "via_count", "unrouted", "grid", "width", "strategy"):
+            self.assertIn(key, doc)
+        self.assertEqual(doc["command"], "autoroute")
+
+    def test_invalid_board_env(self):
+        rc, _, err = self.run_main("autoroute", str(self.tmp / "nope.kicad_pcb"), "--json")
+        self.assertEqual(rc, fid.EXIT_ENV)
+
+    def test_custom_width_and_grid(self):
+        board = self._make_two_resistor_board(self.tmp)
+        rc, out, _ = self.run_main("autoroute", str(board), "--dry-run", "--json", "--width", "0.5", "--grid", "0.5")
+        self.assertEqual(rc, fid.EXIT_OK)
+        doc = json.loads(out)
+        self.assertEqual(doc["width"], 0.5)
+        self.assertEqual(doc["grid"], 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()

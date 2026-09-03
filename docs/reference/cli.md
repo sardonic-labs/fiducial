@@ -28,8 +28,9 @@ python fiducial/scripts/fiducial.py <command> [--help] [--json]
 | `wire-trace <sch> <ref> <pin>` | trace to label/net (`fiducial.py:742`) | — |
 | `label-map <sch>` | labels grouped (`fiducial.py:799`) | — |
 | `pin-positions <sch> <ref>` | absolute endpoints (`fiducial.py:667`, `_compute_pin_positions:618`) | — |
+| `autoroute <pcb>` | deterministic autorouter for non-spatial AI (`pcb_router.py:1`) | `{"routed_nets":n,"segment_count":n,"unrouted":[…]}` |
 
-Flags: `--json` (`erc/drc/check-intent/lint/check-rules`), `--refresh` (bypass cache `fiducial.py:311`), `--orphans` (`check-intent:391`), `--allow` via `rules.csv` `allow-single-use` (`fiducial.py:846`).
+Flags: `--json` (`erc/drc/check-intent/lint/check-rules/overlap-check/autoroute`), `--refresh` (bypass cache `fiducial.py:311`), `--orphans` (`check-intent:391`), `--allow` via `rules.csv` `allow-single-use` (`fiducial.py:846`).
 
 ## Examples (both)
 
@@ -45,8 +46,8 @@ python fiducial/scripts/fiducial.py sexp myboard.kicad_sch --raw | jq .
 ```json
 {
   "cli": "fiducial.py:1252",
-  "commands": ["doctor","erc","drc","netlist","nets","pins","check-intent","lint","check","check-rules","render","bom","sexp","overlap-check","wire-trace","label-map","pin-positions"],
-  "json_flags": ["erc","drc","check-intent","lint","check-rules","overlap-check"],
+  "commands": ["doctor","erc","drc","netlist","nets","pins","check-intent","lint","check","check-rules","render","bom","sexp","overlap-check","wire-trace","label-map","pin-positions","autoroute"],
+  "json_flags": ["erc","drc","check-intent","lint","check-rules","overlap-check","autoroute"],
   "exit_codes": {"0":"clean","1":"violations","2":"env"},
   "netlist_cache": "fiducial.py:311"
 }

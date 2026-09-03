@@ -1362,6 +1362,26 @@ def main(argv=None):
     p.add_argument("ref")
     p.set_defaults(func=cmd_pin_positions)
 
+    p = sub.add_parser("autoroute",
+                        help="deterministic autorouter for non-spatial AI models")
+    p.add_argument("board", help=".kicad_pcb to route")
+    p.add_argument("--out", help="output board path (default: overwrite input)")
+    p.add_argument("--width", type=float, default=0.25,
+                   help="track width mm (default 0.25)")
+    p.add_argument("--grid", type=float, default=0.25,
+                   help="routing grid mm (default 0.25)")
+    p.add_argument("--strategy", choices=["astar", "escape"], default="astar",
+                   help="routing strategy: astar (maze) or escape (L-route)")
+    p.add_argument("--dry-run", action="store_true",
+                   help="report without writing")
+    p.add_argument("--json", action="store_true",
+                   help="machine-readable JSON output")
+    try:
+        from pcb_router import cmd_autoroute
+        p.set_defaults(func=cmd_autoroute)
+    except ImportError:
+        pass
+
     args = ap.parse_args(argv)
 
     try:

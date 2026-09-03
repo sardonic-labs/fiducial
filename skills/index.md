@@ -12,6 +12,7 @@
 | Hierarchy | `schematic/hierarchy.md:1` | `label` vs `global_label` vs `hierarchical_label` |
 | Power parts | `schematic/power-parts-selection.md:1` | dissipation/margin math before selection |
 | Power/ground | `pcb/layout.md` / `pcb/drc-workflow.md` | placement, DRC fix loop |
+| Autoroute (non-spatial AI) | `pcb/autoroute.md` | deterministic maze/L-route, AI topological → router geometric |
 | Prove intent | `verification/netlist-audit.md:1` | `intent.csv` before wiring, `check-intent` gate |
 | Datasheets | `reference/datasheets.md` | find + read, never guess pinouts (`AGENTS.md:11`) |
 | Best practices | `reference/best-practices.md` | power/SI/ESD/DFM checklists |
@@ -47,7 +48,7 @@ Low-level: `schematic_check.py:28` (`power-pins` … `rail-audit`), `pcb_check.p
   "entry": "AGENTS.md:1",
   "golden_rules": "AGENTS.md:10",
   "tools": "AGENTS.md:28 (fiducial.py:1252 + exit 0/1/2)",
-  "skills": ["schematic/authoring.md:1","schematic/authoring-workflow.md:1","schematic/cleanliness.md:1","schematic/hierarchy.md:1","schematic/power-parts-selection.md:1","pcb/layout.md","pcb/drc-workflow.md","verification/netlist-audit.md:1","reference/*"],
+  "skills": ["schematic/authoring.md:1","schematic/authoring-workflow.md:1","schematic/cleanliness.md:1","schematic/hierarchy.md:1","schematic/power-parts-selection.md:1","pcb/layout.md","pcb/drc-workflow.md","pcb/autoroute.md","verification/netlist-audit.md:1","reference/*"],
   "review": ["review/*.md","reviewer.py:22","schematic/pcb/bom_check.py"],
   "builder": "docs/builder.md:1"
 }
