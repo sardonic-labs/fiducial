@@ -23,7 +23,7 @@ def compile_spec(spec_or_path, out="board.kicad_sch", intent_out=None, check=Tru
             for rp in pins:
                 r,p = rp.split(".",1)
                 if r==c["ref"] and p not in allowed:
-                    raise ValueError(f"{r}.{p} not in part {c['part']} pins {sorted(allowed)}")
+                    raise ValueError(f"{r}.{p} not in part {c['part']} pins {sorted(allowed)} — check registry.py and datasheet")
     b = SchematicBuilder(out, title=spec.get("title","Synth Board"))
     # place symbols in a row, 25.4mm apart
     x0, y0 = 50.8, 50.8

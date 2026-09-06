@@ -1,18 +1,23 @@
 # Tutorial — 5-minute blinky (human + agent)
 
-> One path, same for both: `intent.csv` → `SchematicBuilder` → `lint` → `check-intent`.
+> Offline first: no KiCad needed. `lint` + synthesis are stdlib-only.
 
 ## For humans (copy-paste in terminal)
 
 ```sh
 git clone https://github.com/sardonic-labs/fiducial && cd fiducial
+# Fastest path — no KiCad
+python scripts/fiducial.py synthesize examples/synth/blinky.json -o /tmp/blinky.kicad_sch
+python scripts/fiducial.py lint /tmp/blinky.kicad_sch   # Lint clean (4 symbols)
+# With KiCad installed:
+python scripts/fiducial.py doctor
+python scripts/fiducial.py check-intent /tmp/blinky.kicad_sch /tmp/blinky-intent.csv
+# Or: builder API directly
 python examples/builder_demo.py          # writes /tmp/builder_demo.kicad_sch + intent.csv
-python scripts/fiducial.py lint /tmp/builder_demo.kicad_sch
-python scripts/fiducial.py check-intent /tmp/builder_demo.kicad_sch /tmp/builder_demo-intent.csv
-python scripts/fiducial.py sexp /tmp/builder_demo.kicad_sch | head -n 20  # S-exp → JSON
+python scripts/fiducial.py sexp /tmp/builder_demo.kicad_sch  # S-exp → JSON
 ```
 
-Expected: `Lint clean (5 symbols)` (`test_offline.py:228`), `8/8 connections verified` (`netlist-audit.md:7`). Open `/tmp/builder_demo.kicad_sch` in KiCad 10 — it renders.
+Expected: `Lint clean (4 symbols)`, `8/8 connections verified` (`netlist-audit.md:7`). Open `/tmp/blinky.kicad_sch` in KiCad 10 — it renders.
 
 ## For agents (same steps, machine-readable)
 

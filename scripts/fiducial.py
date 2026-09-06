@@ -154,7 +154,14 @@ def main(argv=None):
     p.add_argument("--no-check", action="store_true", help="skip lint after synthesis")
     def _cmd_synth(a):
         from fidsynth.compiler import compile_spec as _cs
-        _cs(a.spec, out=a.out, intent_out=a.intent_out, check=not a.no_check)
+        try:
+            _cs(a.spec, out=a.out, intent_out=a.intent_out, check=not a.no_check)
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            return EXIT_ENV
+        except FileNotFoundError as e:
+            print(f"ERROR: spec not found: {e}", file=sys.stderr)
+            return EXIT_ENV
         return EXIT_OK
     p.set_defaults(func=_cmd_synth)
 

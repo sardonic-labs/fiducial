@@ -20,7 +20,7 @@ def validate_spec(spec):
         raise ValueError("spec must be a dict")
     missing = REQUIRED_TOP - set(spec.keys())
     if missing:
-        raise ValueError(f"spec missing keys: {sorted(missing)}")
+        raise ValueError(f"spec missing keys: {sorted(missing)} — required: {sorted(REQUIRED_TOP)} (see docs/synth.md)")
     if not isinstance(spec["components"], list):
         raise ValueError("spec['components'] must be a list")
     if not isinstance(spec["nets"], dict):
