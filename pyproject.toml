@@ -1,0 +1,13 @@
+[project]
+name="fiducial"
+version="0.2.0"
+description="Verification + synthesis for AI-generated KiCad hardware"
+readme="README.md"
+requires-python=">=3.8"
+dependencies=[]
+
+[project.scripts]
+fiducial="fiducial:main"
+
+[build-system]
+requires=["setuptools"]

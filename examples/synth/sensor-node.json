@@ -1,0 +1,16 @@
+{
+  "title": "Sensor node — MCU + EEPROM + pull-ups",
+  "components": [
+    {"ref": "U1", "part": "TEST_MCU"},
+    {"ref": "U2", "part": "AT24C02"},
+    {"ref": "C1", "part": "C", "value": "100n"},
+    {"ref": "R1", "part": "R", "value": "10k"},
+    {"ref": "R2", "part": "R", "value": "10k"}
+  ],
+  "nets": {
+    "/VCC": ["U1.1", "U2.8", "C1.1", "R1.1", "R2.1"],
+    "/GND": ["U1.4", "U2.4", "C1.2"],
+    "/SDA": ["U1.2", "U2.5", "R1.2"],
+    "/SCL": ["U1.3", "U2.6", "R2.2"]
+  }
+}

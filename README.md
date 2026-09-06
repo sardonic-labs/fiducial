@@ -36,10 +36,14 @@ Requires Python 3.8+ (stdlib only) and KiCad 7+ on PATH for `kicad-cli` (CI uses
 ## Quick start
 
 ```sh
+# Synthesis: spec JSON -> schematic + intent.csv (no KiCad needed)
+python fiducial/scripts/fiducial.py synthesize examples/synth/blinky.json -o board.kicad_sch
+python fiducial/scripts/fiducial.py lint board.kicad_sch          # structure (offline)
+
+# Verification (needs kicad-cli for netlist/ERC)
 python fiducial/scripts/fiducial.py doctor
-python fiducial/scripts/fiducial.py lint myboard.kicad_sch          # structure
-python fiducial/scripts/fiducial.py erc myboard.kicad_sch            # ERC
-python fiducial/scripts/fiducial.py check-intent myboard.kicad_sch intent.csv  # intent
+python fiducial/scripts/fiducial.py erc board.kicad_sch
+python fiducial/scripts/fiducial.py check-intent board.kicad_sch board-intent.csv
 ```
 
 Full command reference: `docs/reference/cli.md` (`fiducial.py:1252`). Diagnostic helpers: `wire-trace`, `label-map`, `pin-positions`, `overlap-check`, `sexp` — all work without `kicad-cli`.

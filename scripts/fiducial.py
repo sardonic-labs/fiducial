@@ -147,6 +147,17 @@ def main(argv=None):
     p.add_argument("ref")
     p.set_defaults(func=cmd_pin_positions)
 
+    p = sub.add_parser("synthesize", help="compile board-spec JSON to .kicad_sch + intent.csv")
+    p.add_argument("spec", help="board spec JSON (see docs/synth.md)")
+    p.add_argument("-o", "--out", default="board.kicad_sch", help="output .kicad_sch")
+    p.add_argument("--intent-out", help="output intent.csv (default: <out>-intent.csv)")
+    p.add_argument("--no-check", action="store_true", help="skip lint after synthesis")
+    def _cmd_synth(a):
+        from fidsynth.compiler import compile_spec as _cs
+        _cs(a.spec, out=a.out, intent_out=a.intent_out, check=not a.no_check)
+        return EXIT_OK
+    p.set_defaults(func=_cmd_synth)
+
     p = sub.add_parser("autoroute",
                         help="deterministic autorouter for non-spatial AI models")
     p.add_argument("board", help=".kicad_pcb to route")

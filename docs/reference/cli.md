@@ -28,6 +28,7 @@ python fiducial/scripts/fiducial.py <command> [--help] [--json]
 | `wire-trace <sch> <ref> <pin>` | trace to label/net (`fiducial.py:742`) | — |
 | `label-map <sch>` | labels grouped (`fiducial.py:799`) | — |
 | `pin-positions <sch> <ref>` | absolute endpoints (`fiducial.py:667`, `_compute_pin_positions:618`) | — |
+| `synthesize <spec.json>` | spec → `.kicad_sch` + `intent.csv` (`fidsynth/compiler.py:1`, `docs/synth.md:1`) | — |
 | `autoroute <pcb>` | deterministic autorouter for non-spatial AI (`pcb_router.py:1`) | `{"routed_nets":n,"segment_count":n,"unrouted":[…]}` |
 
 Flags: `--json` (`erc/drc/check-intent/lint/check-rules/overlap-check/autoroute`), `--refresh` (bypass cache `fiducial.py:311`), `--orphans` (`check-intent:391`), `--allow` via `rules.csv` `allow-single-use` (`fiducial.py:846`).

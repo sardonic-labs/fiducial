@@ -1,0 +1,15 @@
+{
+  "title": "Blinky — LED + MCU + decoupling",
+  "components": [
+    {"ref": "U1", "part": "TEST_MCU"},
+    {"ref": "C1", "part": "C", "value": "100n"},
+    {"ref": "R1", "part": "R", "value": "330"},
+    {"ref": "D1", "part": "LED"}
+  ],
+  "nets": {
+    "/VCC": ["U1.1", "C1.1"],
+    "/GND": ["U1.4", "C1.2", "D1.2"],
+    "/LED": ["U1.2", "R1.1"],
+    "/LED_R": ["R1.2", "D1.1"]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "title": "Power entry — 3V3 regulator + caps",
+  "components": [
+    {"ref": "U1", "part": "REG_3V3"},
+    {"ref": "C1", "part": "C", "value": "1u"},
+    {"ref": "C2", "part": "C", "value": "1u"}
+  ],
+  "nets": {
+    "/VBAT": ["U1.1", "C1.1"],
+    "/3V3": ["U1.5", "C2.1"],
+    "/GND": ["U1.2", "C1.2", "C2.2"]
+  }
+}
