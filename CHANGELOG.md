@@ -15,6 +15,12 @@ Additive only — no contract break.
 - Fix-loop practice guide: `docs/howto/fix-a-seeded-fault.md`.
 - Fix: `--help` no longer crashes on Windows (cp1252) — replaced `→`
   with `to` in the `sexp` subcommand help (`scripts/fiducial.py`).
+- Refactor: split `scripts/fiducial.py` (1398 lines) into the `fidcore`
+  package (`const`, `sexp`, `kicad`, `netlist`, `lint`, `diagnostics`,
+  `output`, `gate`); `fiducial.py` keeps argparse + `main()` and
+  re-exports the compat surface, so CLI, exit codes, `from fiducial
+  import X`, and `docs_check.py` are unaffected. Tests retargeted to
+  patch `fidcore.kicad.kicad_cli` / `fidcore.netlist._export_netlist`.
   Tests: `129 OK (10 skipped, kicad-cli absent)`.
 
 ## v0.1.0 — 2026-08-31

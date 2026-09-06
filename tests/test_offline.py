@@ -33,6 +33,12 @@ _spec = importlib.util.spec_from_file_location(
 fid = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(fid)
 
+# Patch targets: kicad_cli and _export_netlist live in fidcore submodules
+# (fiducial.py only re-exports them, so patching fid.* would not affect
+# the internal call sites).
+import fidcore.kicad as fidk
+import fidcore.netlist as fidn
+
 # Matches tests/fixtures/healthy.kicad_sch (refs R1, C1, U1).
 NETLIST_HEALTHY = """(export (version "E")
 \t(components
@@ -112,7 +118,7 @@ INTENT_MIXED = ("ref,pin,expected_net\n"
 
 
 def fake_kicad_cli(calls, payload=None):
-    """Return a stand-in for fid.kicad_cli that records args and, when
+    """Return a stand-in for fidk.kicad_cli that records args and, when
     payload is not None, writes a JSON report to the requested --output."""
     def _fake(args, timeout=180):
         calls.append(list(args))
@@ -397,9 +403,9 @@ class TestStaleNetlistCache(OfflineTest):
     def setUp(self):
         super().setUp()
         self.calls = []
-        self._orig = fid._export_netlist
-        fid._export_netlist = self._fake_export
-        self.addCleanup(setattr, fid, "_export_netlist", self._orig)
+        self._orig = fidn._export_netlist
+        fidn._export_netlist = self._fake_export
+        self.addCleanup(setattr, fidn, "_export_netlist", self._orig)
 
     def _fake_export(self, project):
         self.calls.append(str(project))
@@ -436,11 +442,11 @@ class TestUniqueTempReports(OfflineTest):
     def setUp(self):
         super().setUp()
         self.calls = []
-        self._orig = fid.kicad_cli
-        self.addCleanup(setattr, fid, "kicad_cli", self._orig)
+        self._orig = fidk.kicad_cli
+        self.addCleanup(setattr, fidk, "kicad_cli", self._orig)
 
     def test_report_paths_are_unique_and_cleaned_up(self):
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"erc": []})
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"erc": []})
         paths = []
         for _ in range(2):
             rc, out, _ = self.run_main("erc", "board.kicad_sch")
@@ -456,7 +462,7 @@ class TestUniqueTempReports(OfflineTest):
         self.assertEqual(leftovers, [])
 
     def test_predictable_legacy_path_never_used(self):
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
         legacy = Path(tempfile.gettempdir()) / "fiducial-drc.json"
         legacy.write_text('{"drc": [{"severity": "severity_error"}]}',
                           encoding="utf-8")
@@ -467,7 +473,7 @@ class TestUniqueTempReports(OfflineTest):
         self.assertIn("0 errors", out)
 
     def test_failed_run_reports_env_error(self):
-        fid.kicad_cli = fake_kicad_cli(self.calls, payload=None)
+        fidk.kicad_cli = fake_kicad_cli(self.calls, payload=None)
         rc, _, err = self.run_main("erc", "board.kicad_sch")
         self.assertEqual(rc, fid.EXIT_ENV)
         self.assertIn("no ERC report produced", err)
@@ -479,9 +485,9 @@ class TestDrcMutation(OfflineTest):
     def setUp(self):
         super().setUp()
         self.calls = []
-        self._orig = fid.kicad_cli
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
-        self.addCleanup(setattr, fid, "kicad_cli", self._orig)
+        self._orig = fidk.kicad_cli
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
+        self.addCleanup(setattr, fidk, "kicad_cli", self._orig)
 
     def test_default_does_not_save_board(self):
         rc, out, _ = self.run_main("drc", "board.kicad_pcb")
@@ -506,8 +512,8 @@ class TestJsonReports(OfflineTest):
     def setUp(self):
         super().setUp()
         self.calls = []
-        self._orig = fid.kicad_cli
-        self.addCleanup(setattr, fid, "kicad_cli", self._orig)
+        self._orig = fidk.kicad_cli
+        self.addCleanup(setattr, fidk, "kicad_cli", self._orig)
 
     def test_erc_json_counts_violations(self):
         payload = {"erc": [
@@ -516,7 +522,7 @@ class TestJsonReports(OfflineTest):
             {"severity": "severity_warning", "type": "warn_type",
              "description": "warning text", "pos": "1,1", "items": []},
         ]}
-        fid.kicad_cli = fake_kicad_cli(self.calls, payload)
+        fidk.kicad_cli = fake_kicad_cli(self.calls, payload)
         rc, out, _ = self.run_main("erc", "board.kicad_sch", "--json")
         self.assertEqual(rc, fid.EXIT_VIOLATIONS)
         doc = json.loads(out)
@@ -526,7 +532,7 @@ class TestJsonReports(OfflineTest):
                          "pins not connected")
 
     def test_erc_human_output_unchanged_shape(self):
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"erc": []})
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"erc": []})
         rc, out, _ = self.run_main("erc", "board.kicad_sch")
         self.assertEqual(rc, fid.EXIT_OK)
         self.assertIn("ERC on board.kicad_sch: 0 errors, 0 warnings", out)
@@ -953,12 +959,12 @@ class TestDrcRenderOffline(OfflineTest):
     def setUp(self):
         super().setUp()
         self.calls = []
-        self._orig = fid.kicad_cli
-        self.addCleanup(setattr, fid, "kicad_cli", self._orig)
+        self._orig = fidk.kicad_cli
+        self.addCleanup(setattr, fidk, "kicad_cli", self._orig)
 
     def test_drc_clean_offline(self):
         self.calls.clear()
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
         rc, out, _ = self.run_main("drc", str(FIXTURES / "healthy.kicad_pcb"))
         self.assertEqual(rc, fid.EXIT_OK)
         self.assertIn("0 errors", out)
@@ -971,7 +977,7 @@ class TestDrcRenderOffline(OfflineTest):
             {"severity": "severity_warning", "type": "annular",
              "description": "thin ring", "pos": "20,20", "items": []},
         ]}
-        fid.kicad_cli = fake_kicad_cli(self.calls, payload)
+        fidk.kicad_cli = fake_kicad_cli(self.calls, payload)
         rc, out, _ = self.run_main("drc", str(FIXTURES / "healthy.kicad_pcb"))
         self.assertEqual(rc, fid.EXIT_VIOLATIONS)
         self.assertIn("1 errors", out)
@@ -981,7 +987,7 @@ class TestDrcRenderOffline(OfflineTest):
         payload = {"drc": [
             {"severity": "severity_error", "type": "err", "description": "e", "pos": "0,0", "items": []},
         ]}
-        fid.kicad_cli = fake_kicad_cli(self.calls, payload)
+        fidk.kicad_cli = fake_kicad_cli(self.calls, payload)
         rc, out, _ = self.run_main("drc", str(FIXTURES / "healthy.kicad_pcb"), "--json")
         self.assertEqual(rc, fid.EXIT_VIOLATIONS)
         doc = json.loads(out)
@@ -990,20 +996,20 @@ class TestDrcRenderOffline(OfflineTest):
         self.assertEqual(doc["warning_count"], 0)
 
     def test_drc_human_output_shape(self):
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
         rc, out, _ = self.run_main("drc", str(FIXTURES / "healthy.kicad_pcb"))
         self.assertIn("DRC on", out)
         self.assertIn("0 errors, 0 warnings", out)
 
     def test_drc_missing_file_env(self):
         # payload None simulates kicad_cli ran but produced no report -> env
-        fid.kicad_cli = fake_kicad_cli(self.calls, payload=None)
+        fidk.kicad_cli = fake_kicad_cli(self.calls, payload=None)
         rc, _, err = self.run_main("drc", str(FIXTURES / "healthy.kicad_pcb"))
         self.assertEqual(rc, fid.EXIT_ENV)
         self.assertIn("no DRC report", err)
 
     def test_drc_parity_and_save_board_flags(self):
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
         self.run_main("drc", str(FIXTURES / "healthy.kicad_pcb"), "--parity")
         self.assertIn("--schematic-parity", self.calls[-1])
         self.calls.clear()
@@ -1030,7 +1036,7 @@ class TestDrcRenderOffline(OfflineTest):
                     Path(target).mkdir(parents=True, exist_ok=True)
                     (Path(target) / "board.svg").write_text("<svg></svg>")
             return subprocess.CompletedProcess(args, returncode=0, stdout="", stderr="")
-        fid.kicad_cli = fake_render
+        fidk.kicad_cli = fake_render
         rc, out, _ = self.run_main("render", str(FIXTURES / "healthy.kicad_pcb"), "--outdir", str(outdir))
         self.assertEqual(rc, fid.EXIT_OK)
         self.assertIn("rendered", out)
@@ -1045,17 +1051,17 @@ class TestDrcRenderOffline(OfflineTest):
                 target = Path(args[idx+1])
                 target.mkdir(parents=True, exist_ok=True)
             return subprocess.CompletedProcess(args, returncode=0, stdout="", stderr="")
-        fid.kicad_cli = fake_render
+        fidk.kicad_cli = fake_render
         rc, out, _ = self.run_main("render", str(FIXTURES / "healthy.kicad_sch"), "--outdir", str(outdir))
         self.assertEqual(rc, fid.EXIT_OK)
         self.assertIn("rendered", out)
 
     def test_render_missing_file_env(self):
-        fid.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
+        fidk.kicad_cli = fake_kicad_cli(self.calls, {"drc": []})
         # render of nonexistent file should still attempt kicad_cli but fail gracefully
         def fail_render(args, timeout=180):
             return subprocess.CompletedProcess(args, returncode=1, stdout="", stderr="file not found")
-        fid.kicad_cli = fail_render
+        fidk.kicad_cli = fail_render
         rc, _, err = self.run_main("render", str(self.tmp / "nope.kicad_pcb"), "--outdir", str(self.tmp / "out"))
         self.assertEqual(rc, fid.EXIT_ENV)
 
