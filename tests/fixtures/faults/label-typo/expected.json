@@ -1,0 +1,7 @@
+{
+  "fault": "label-typo",
+  "lint_exit": 1,
+  "intent_exit": 1,
+  "lint_match": "appears only once",
+  "intent_match": "WRONG"
+}

@@ -1333,7 +1333,7 @@ def main(argv=None):
     p.add_argument("project")
     p.set_defaults(func=cmd_bom)
 
-    p = sub.add_parser("sexp", help="parse S-expression file → JSON (for agents)")
+    p = sub.add_parser("sexp", help="parse S-expression file to JSON (for agents)")
     p.add_argument("file", help=".kicad_sch, .kicad_pcb, .sexpr, or any S-expr file")
     p.add_argument("--raw", action="store_true",
                    help="emit raw nested lists instead of keyed objects")

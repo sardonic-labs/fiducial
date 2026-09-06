@@ -2,6 +2,21 @@
 
 > `v0.1.0` changelog *is* the compatibility contract (`docs/explanation/compatibility.md:1`, `ROADMAP.md:21`). From `v0.1.0` onward: CSV formats, CLI surface, exit codes, and JSON shapes are stable; see compatibility doc for the table. Any breaking change requires a minor version bump and an entry here.
 
+## Unreleased
+
+Additive only — no contract break.
+
+- Seeded-fault benchmark: `scripts/seed_faults.py` generates 8 broken
+  schematic variants (`label-typo`, `floating-pin`, `wrong-net`,
+  `missing-part`, `duplicate-ref`, `off-grid`, `power-short`,
+  `nc-violation`) under `tests/fixtures/faults/`, each with `intent.csv`,
+  an offline netlist cache, and `expected.json`; `tests/test_seeded_faults.py`
+  asserts each fault is caught by the expected tool (16/16 checks).
+- Fix-loop practice guide: `docs/howto/fix-a-seeded-fault.md`.
+- Fix: `--help` no longer crashes on Windows (cp1252) — replaced `→`
+  with `to` in the `sexp` subcommand help (`scripts/fiducial.py`).
+  Tests: `129 OK (10 skipped, kicad-cli absent)`.
+
 ## v0.1.0 — 2026-08-31
 
 First release — contract frozen.

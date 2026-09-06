@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
 *-netlist.sexpr
+!tests/fixtures/faults/**/*-netlist.sexpr
 *-bom.csv
 render/
 

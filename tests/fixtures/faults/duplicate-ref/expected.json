@@ -1,0 +1,7 @@
+{
+  "fault": "duplicate-ref",
+  "lint_exit": 1,
+  "intent_exit": 0,
+  "lint_match": "duplicate reference",
+  "intent_match": "connections verified"
+}

@@ -1,0 +1,104 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(uuid f0000000-0000-0000-0000-000000000001)
+	(paper "A4")
+	(title_block
+		(title "Fiducial offline test board - healthy")
+		(rev "A")
+	)
+	(lib_symbols
+		(symbol "Device:R"
+			(property "Reference" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "R"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+		)
+		(symbol "Device:C"
+			(property "Reference" "C"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "C"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+		)
+		(symbol "Test:MCU"
+			(property "Reference" "U"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+			(property "Value" "MCU"
+				(at 0 0 0)
+				(effects (font (size 1.27 1.27)))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(uuid f0000000-0000-0000-0000-000000000010)
+		(at 50.8 50.8 0)
+		(property "Reference" "R1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "10k"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "R1") (unit 1))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C")
+		(uuid f0000000-0000-0000-0000-000000000011)
+		(at 81.28 50.8 0)
+		(property "Reference" "C1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "100n"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "C1") (unit 1))
+			)
+		)
+	)
+	(symbol
+		(lib_id "Test:MCU")
+		(uuid f0000000-0000-0000-0000-000000000012)
+		(at 121.92 50.8 0)
+		(property "Reference" "U1"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(property "Value" "TestMCU"
+			(at 0 0 0)
+			(effects (font (size 1.27 1.27)))
+		)
+		(instances
+			(project ""
+				(path (reference "U1") (unit 1))
+			)
+		)
+	)
+	(label "/AX" (at 12.7 12.7 0))
+	(label "/A" (at 20.32 12.7 0))
+	(label "/B" (at 12.7 15.24 0))
+	(label "/B" (at 20.32 15.24 0))
+	(label "/VCC" (at 12.7 20.32 0))
+	(label "/VCC" (at 20.32 20.32 0))
+	(label "/GND" (at 12.7 26.67 0))
+	(label "/GND" (at 20.32 26.67 0))
+)

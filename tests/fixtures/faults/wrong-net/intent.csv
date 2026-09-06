@@ -1,0 +1,5 @@
+ref,pin,expected_net
+R1,1,/A
+R1,2,/B
+U1,1,/VCC
+C1,2,/GND
