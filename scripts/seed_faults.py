@@ -9,6 +9,9 @@ catches the fault.
 Stdlib-only, deterministic (no --seed needed: mutations are fixed).
 Offline: the netlist cache is written NEWER than the .sch so
 `lint` / `check-intent` reuse it without calling kicad-cli.
+NOTE: git does not preserve mtimes, so this newness is lost at
+checkout; tests/test_seeded_faults.py setUpClass re-touches the
+caches at run time to restore the invariant.
 
 Usage:
     python scripts/seed_faults.py            # write fixtures

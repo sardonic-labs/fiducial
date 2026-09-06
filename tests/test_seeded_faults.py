@@ -10,8 +10,10 @@ Run:        python -m unittest discover -s tests -v
 """
 
 import json
+import os
 import subprocess
 import sys
+import time
 import unittest
 from pathlib import Path
 
@@ -34,6 +36,21 @@ def fault_cases():
 
 
 class TestSeededFaults(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Git does not preserve mtimes, so the "netlist newer than sch"
+        # invariant from seed_faults.py is lost at checkout. Refresh it
+        # here so lint/check-intent reuse the shipped cache instead of
+        # invoking kicad-cli (which would re-export from the synthetic
+        # mutant boards and fail). Makes the test hermetic with or
+        # without kicad-cli on PATH.
+        now = time.time() + 10
+        for exp_path in sorted(FAULTS.glob("*/expected.json")):
+            d = exp_path.parent
+            sch_mtime = (d / "board.kicad_sch").stat().st_mtime
+            stamp = max(now, sch_mtime + 1)
+            os.utime(d / "board-netlist.sexpr", (stamp, stamp))
+
     def test_all_faults_present(self):
         self.assertTrue(FAULTS.is_dir(), f"missing {FAULTS}; run seed_faults.py")
         names = sorted(p.parent.name for p in FAULTS.glob("*/expected.json"))
